@@ -2,10 +2,11 @@
 
 use p2panda_encryption::key_bundle::{KeyBundleError, LongTermKeyBundle};
 use p2panda_encryption::traits::KeyBundle;
+use serde::{Deserialize, Serialize};
 
 use crate::types::ActorId;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Member {
     id: ActorId,
     key_bundle: LongTermKeyBundle,
