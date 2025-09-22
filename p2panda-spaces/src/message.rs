@@ -27,7 +27,7 @@ pub trait SpacesMessage<ID, C> {
     fn args(&self) -> &SpacesArgs<ID, C>;
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum SpacesArgs<ID, C> {
     /// System message, contains key bundle of the given author.
     ///
@@ -94,7 +94,7 @@ pub enum SpacesArgs<ID, C> {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SpaceMembershipControlMessage {
     Create {
         initial_members: Vec<ActorId>,

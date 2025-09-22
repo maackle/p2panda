@@ -68,7 +68,7 @@ pub trait AckedGroupMembership<ID, OP> {
 /// This is the DGM interface for p2panda's "data encryption" scheme.
 #[cfg(any(test, feature = "data_scheme"))]
 pub trait GroupMembership<ID, OP> {
-    type State: Clone + Debug + Serialize + for<'a> Deserialize<'a>;
+    type State: Clone + Debug + PartialEq + Eq + Serialize + for<'a> Deserialize<'a>;
 
     type Error: Error;
 
