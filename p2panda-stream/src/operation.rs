@@ -39,7 +39,10 @@ where
         .has_operation(operation.hash)
         .await
         .map_err(|err| IngestError::StoreError(err.to_string()))?;
-    if !already_exists {
+
+    if already_exists {
+        return Ok(IngestResult::Duplicate(operation));
+    } else {
         // If no pruning flag is set, we expect the log to have integrity with the previously given
         // operation.
         if !prune_flag && operation.header.seq_num > 0 {
@@ -113,6 +116,9 @@ pub enum IngestResult<E> {
     /// Operation has been successfully validated and persisted.
     Complete(Operation<E>),
 
+    /// Operation was already present in the store.
+    Duplicate(Operation<E>),
+
     /// We're missing previous operations before we can try validating the backlink of this
     /// operation.
     ///
@@ -136,6 +142,9 @@ pub enum IngestError {
     /// Critical storage failure occurred. This is usually a reason to panic.
     #[error("critical storage failure: {0}")]
     StoreError(String),
+
+    #[error("operation already exists in store: {0}")]
+    Duplicate(p2panda_core::Hash),
 
     /// Some implementations might optimistically retry to ingest operations which arrived
     /// out-of-order. This error comes up when all given attempts have been exhausted.

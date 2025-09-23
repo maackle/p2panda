@@ -37,17 +37,38 @@ iroh-quinn = { version = "0.13.0", features = ["futures-io"] }
 netwatch = "0.4.0"
 p2panda-core = { path = "../p2panda-core", version = "0.4.0" }
 p2panda-discovery = { path = "../p2panda-discovery", version = "0.4.0" }
-p2panda-sync = { path = "../p2panda-sync", version = "0.4.0", features = ["log-sync"] }
+p2panda-sync = { path = "../p2panda-sync", version = "0.4.0", features = [
+  "log-sync",
+] }
 rand = "0.8.5"
 serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
 tokio = { version = "1.44.2", features = ["rt", "sync", "time"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
-tokio-util = { version = "0.7.14", features = ["compat", "codec", "io-util", "io"] }
+tokio-util = { version = "0.7.14", features = [
+  "compat",
+  "codec",
+  "io-util",
+  "io",
+] }
 tracing = "0.1.41"
 
 [dev-dependencies]
 clap = { version = "4.5.35", features = ["derive"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-p2panda-sync = { path = "../p2panda-sync", version = "0.4.0", features = ["log-sync", "test-protocols"] }
+derive_more = { version = "1.0.0", features = ["full"] }
+p2panda-sync = { path = "../p2panda-sync", version = "0.4.0", features = [
+  "log-sync",
+  "test-protocols",
+] }
 p2panda-store = { path = "../p2panda-store", version = "0.4.0" }
+p2panda-spaces = { path = "../p2panda-spaces", version = "0.1.0", features = [
+  "test_utils",
+] }
+p2panda-auth = { path = "../p2panda-auth", version = "0.4.0", features = [
+  "serde",
+], default-features = false }
+p2panda-core = { path = "../p2panda-core", version = "0.4.0", default-features = false }
+p2panda-encryption = { path = "../p2panda-encryption", version = "0.4.0", features = [
+  "data_scheme",
+], default-features = false }

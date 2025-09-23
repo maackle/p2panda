@@ -153,6 +153,9 @@ where
                     Ok((IngestResult::Complete(operation), _)) => {
                         return Poll::Ready(Some(Ok(operation)));
                     }
+                    Ok((IngestResult::Duplicate(operation), _)) => {
+                        return Poll::Ready(Some(Err(IngestError::Duplicate(operation.hash))));
+                    }
                     Err(err) => {
                         // Ingest failed and we want the stream consumers to be aware of that.
                         return Poll::Ready(Some(Err(err)));
