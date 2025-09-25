@@ -487,6 +487,43 @@ async fn register_key_bundles_after_space_creation() {
 }
 
 #[tokio::test]
+async fn ooo() {
+    let alice = TestPeer::new(0);
+    let bob = TestPeer::new(1);
+
+    let bob_id = bob.manager.id().await;
+
+    // Manually register key bundles of all members.
+
+    alice
+        .manager
+        .register_member(&bob.manager.me().await.unwrap())
+        .await
+        .unwrap();
+
+    bob.manager
+        .register_member(&alice.manager.me().await.unwrap())
+        .await
+        .unwrap();
+
+    // Alice creates a space, adds Bob in a following step and then sends a message.
+
+    let space_id = 0;
+    let (alice_space, create) = alice.manager.create_space(space_id, &[]).await.unwrap();
+    let add = alice_space.add(bob_id, Access::read()).await.unwrap();
+    let publish = alice_space.publish(b"Hello bob").await.unwrap();
+
+    let mut msgs: Vec<_> = [create, add, vec![publish]].into_iter().flatten().collect();
+
+    // Bob processes all of Alice's messages...in reverse!
+
+    msgs.reverse();
+    for msg in msgs {
+        bob.manager.process(&msg).await.unwrap();
+    }
+}
+
+#[tokio::test]
 async fn send_and_receive_after_add() {
     let alice = TestPeer::new(0);
     let bob = TestPeer::new(1);
