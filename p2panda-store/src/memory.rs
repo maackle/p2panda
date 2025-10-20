@@ -20,7 +20,7 @@ type StoredOperation<L, E> = (L, Header<E>, Option<Body>, RawHeader);
 /// An in-memory store for core p2panda data types: `Operation` and `Log`.
 #[derive(Clone, Debug)]
 pub struct InnerMemoryStore<L, E> {
-    operations: HashMap<Hash, StoredOperation<L, E>>,
+    pub operations: HashMap<Hash, StoredOperation<L, E>>,
     logs: HashMap<(PublicKey, L), BTreeSet<LogMeta>>,
 }
 
