@@ -120,6 +120,8 @@ where
                 //    otherwise forward the result to the stream consumer.
                 match ingest_res {
                     Ok((IngestResult::Retry(header, body, header_bytes, num_missing), counter)) => {
+                        tracing::info!(hash = %header.hash(), num_missing, "Retry ingest operation");
+
                         // The number of max. reattempts is equal the size of the buffer. As long as
                         // the buffer is just a FIFO queue it doesn't make sense to optimize over
                         // different parameters as in a worst-case distribution of items (exact
