@@ -14,7 +14,7 @@ use crate::auth::orderer::AuthOrderer;
 use crate::space::SpaceState;
 use crate::test_utils::{TestConditions, TestMessage, TestSpaceId};
 use crate::traits::{
-    AuthStore, KeyRegistryStore, KeySecretStore, MessageStore, SpaceId, SpaceStore,
+    AuthStore, KeyRegistryStore, KeySecretStore, MessageStore, SpaceId, SpacesStore,
 };
 use crate::types::{ActorId, AuthGroupState};
 
@@ -56,7 +56,7 @@ where
     }
 }
 
-impl<I, M, C> SpaceStore<I, M, C> for MemoryStore<I, M, C>
+impl<I, M, C> SpacesStore<I, M, C> for MemoryStore<I, M, C>
 where
     I: SpaceId + std::hash::Hash + Eq,
     M: Clone,

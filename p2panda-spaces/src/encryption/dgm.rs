@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 
+use p2panda_encryption::traits::GroupMembership;
 use serde::{Deserialize, Serialize};
 
 use crate::types::{ActorId, OperationId};
@@ -21,9 +22,7 @@ pub struct EncryptionMembershipState {
     pub(crate) members: HashSet<ActorId>,
 }
 
-impl p2panda_encryption::traits::GroupMembership<ActorId, OperationId>
-    for EncryptionGroupMembership
-{
+impl GroupMembership<ActorId, OperationId> for EncryptionGroupMembership {
     type State = EncryptionMembershipState;
 
     type Error = Infallible;
