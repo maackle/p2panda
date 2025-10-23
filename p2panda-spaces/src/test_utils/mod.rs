@@ -2,7 +2,7 @@
 
 mod forge;
 mod message;
-mod store;
+pub mod store;
 
 use p2panda_auth::traits::Conditions;
 use p2panda_encryption::Rng;

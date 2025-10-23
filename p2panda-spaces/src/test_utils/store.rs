@@ -13,30 +13,32 @@ use crate::OperationId;
 use crate::auth::orderer::AuthOrderer;
 use crate::space::SpaceState;
 use crate::test_utils::{TestConditions, TestMessage, TestSpaceId};
-use crate::traits::{AuthStore, KeyRegistryStore, KeySecretStore, MessageStore, SpacesStore};
+use crate::traits::{
+    AuthStore, KeyRegistryStore, KeySecretStore, MessageStore, SpaceId, SpacesStore,
+};
 use crate::types::{ActorId, AuthGroupState};
 
-pub type TestStore = MemoryStore<TestMessage, TestConditions>;
+pub type TestStore = MemoryStore<TestSpaceId, TestMessage, TestConditions>;
 
 #[derive(Debug)]
-pub struct MemoryStoreInner<M, C>
+pub struct MemoryStoreInner<I, M, C>
 where
     C: Conditions,
 {
     auth: AuthGroupState<C>,
-    spaces: HashMap<TestSpaceId, SpaceState<TestSpaceId, M, C>>,
+    spaces: HashMap<I, SpaceState<I, M, C>>,
     messages: HashMap<OperationId, M>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MemoryStore<M, C>
+pub struct MemoryStore<I, M, C>
 where
     C: Conditions,
 {
-    pub(crate) inner: Arc<RwLock<MemoryStoreInner<M, C>>>,
+    pub(crate) inner: Arc<RwLock<MemoryStoreInner<I, M, C>>>,
 }
 
-impl<M, C> MemoryStore<M, C>
+impl<I, M, C> MemoryStore<I, M, C>
 where
     C: Conditions,
 {
@@ -54,44 +56,39 @@ where
     }
 }
 
-impl<M, C> SpacesStore<TestSpaceId, M, C> for MemoryStore<M, C>
+impl<I, M, C> SpacesStore<I, M, C> for MemoryStore<I, M, C>
 where
+    I: SpaceId + std::hash::Hash + Eq,
     M: Clone,
     C: Conditions,
 {
     type Error = Infallible;
 
-    async fn space(
-        &self,
-        id: &TestSpaceId,
-    ) -> Result<Option<SpaceState<TestSpaceId, M, C>>, Self::Error> {
+    async fn space(&self, id: &I) -> Result<Option<SpaceState<I, M, C>>, Self::Error> {
         let inner = self.inner.read().await;
         Ok(inner.spaces.get(id).cloned())
     }
 
-    async fn has_space(&self, id: &TestSpaceId) -> Result<bool, Self::Error> {
+    async fn has_space(&self, id: &I) -> Result<bool, Self::Error> {
         let inner = self.inner.read().await;
         Ok(inner.spaces.contains_key(id))
     }
 
-    async fn spaces_ids(&self) -> Result<Vec<TestSpaceId>, Self::Error> {
+    async fn spaces_ids(&self) -> Result<Vec<I>, Self::Error> {
         let inner = self.inner.read().await;
         Ok(inner.spaces.keys().cloned().collect())
     }
 
-    async fn set_space(
-        &self,
-        id: &TestSpaceId,
-        y: SpaceState<TestSpaceId, M, C>,
-    ) -> Result<(), Self::Error> {
+    async fn set_space(&self, id: &I, y: SpaceState<I, M, C>) -> Result<(), Self::Error> {
         let mut inner = self.inner.write().await;
         inner.spaces.insert(*id, y);
         Ok(())
     }
 }
 
-impl<M, C> AuthStore<C> for MemoryStore<M, C>
+impl<I, M, C> AuthStore<C> for MemoryStore<I, M, C>
 where
+    I: SpaceId + std::hash::Hash + Eq,
     C: Conditions,
 {
     type Error = Infallible;
@@ -108,8 +105,9 @@ where
     }
 }
 
-impl<M, C> MessageStore<M> for MemoryStore<M, C>
+impl<I, M, C> MessageStore<M> for MemoryStore<I, M, C>
 where
+    I: SpaceId + std::hash::Hash + Eq,
     M: Clone,
     C: Conditions,
 {

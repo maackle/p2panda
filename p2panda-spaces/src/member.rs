@@ -20,7 +20,7 @@ impl Member {
     // Since we're currently not allowing to construct `Member` from "the outside" (all instances
     // are provided by our API which derived everything from signed messages) I don't see an issue
     // yet, but care will be required as soon as `Member` gets constructable, serializable etc.
-    pub(crate) fn new(id: ActorId, key_bundle: LongTermKeyBundle) -> Self {
+    pub fn new(id: ActorId, key_bundle: LongTermKeyBundle) -> Self {
         Self { id, key_bundle }
     }
 
