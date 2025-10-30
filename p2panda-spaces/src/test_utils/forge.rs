@@ -28,7 +28,7 @@ where
             store,
             inner: Arc::new(RwLock::new(TestForgeInner {
                 next_seq_num: 0,
-                private_key,
+                _private_key: private_key,
             })),
         }
     }
@@ -37,7 +37,7 @@ where
 #[derive(Debug)]
 pub struct TestForgeInner {
     next_seq_num: SeqNum,
-    private_key: PrivateKey,
+    _private_key: PrivateKey,
 }
 
 impl<S> Forge<TestSpaceId, TestMessage, TestConditions> for TestForge<S>
