@@ -444,6 +444,7 @@ where
         &self,
         auth_message: &M,
     ) -> Result<(Vec<M>, Vec<Event<ID, C>>), ManagerError<ID, S, K, F, M, C, RS>> {
+        dbg!();
         let space_ids = {
             let manager = self.inner.read().await;
             manager
@@ -453,10 +454,13 @@ where
                 .map_err(ManagerError::SpacesStore)?
         };
 
+        dbg!();
         let mut messages = vec![];
         let mut events = vec![];
         for id in space_ids {
+            dbg!(&id);
             let (message, event) = self.apply_group_change_to_space(auth_message, id).await?;
+            dbg!(&id);
             if let Some(message) = message {
                 messages.push(message);
             }

@@ -81,12 +81,15 @@ where
         manager_ref: Manager<ID, S, K, F, M, C, RS>,
         initial_members: Vec<(ActorId, Access<C>)>,
     ) -> Result<(Self, Vec<M>, Event<ID, C>), GroupError<ID, S, K, F, M, C, RS>> {
+        dbg!();
+
         // Generate random group id.
         let group_id: ActorId = {
             let manager = manager_ref.inner.read().await;
             let private_key = PrivateKey::from_bytes(&manager.rng.random_array()?);
             private_key.public_key().into()
         };
+        dbg!();
 
         let initial_members = typed_members(manager_ref.clone(), initial_members)
             .await
@@ -99,8 +102,10 @@ where
             },
         };
 
+        dbg!();
         let (messages, mut events) =
             Self::process_local_control(manager_ref.clone(), control_message).await?;
+        dbg!();
 
         // Sanity check: there should only one event as this group was only just
         // created and cannot be associated with any space yet.
@@ -211,9 +216,12 @@ where
             manager.store.auth().await.map_err(GroupError::AuthStore)?
         };
 
+        dbg!();
+
         let (mut auth_y, auth_message) =
             AuthGroup::prepare(auth_y, &control_message).map_err(GroupError::AuthGroup)?;
 
+        dbg!();
         let args = SpacesArgs::Auth {
             control_message: auth_message.payload(),
             auth_dependencies: auth_message.dependencies(),
@@ -224,13 +232,16 @@ where
             manager.identity.forge(args).await?
         };
         let auth_message = AuthMessage::from_forged(&message);
+        dbg!();
 
         {
             let manager = manager_ref.inner.write().await;
             auth_y = AuthGroup::process(auth_y, &auth_message).map_err(GroupError::AuthGroup)?;
+            dbg!();
             auth_y
                 .orderer_y
                 .add_dependency(auth_message.id(), &auth_message.dependencies());
+            dbg!();
             manager
                 .store
                 .set_auth(&auth_y)
@@ -238,12 +249,15 @@ where
                 .map_err(GroupError::AuthStore)?;
         }
 
+        dbg!();
         let auth_event = auth_message_to_group_event(&auth_y, &auth_message);
+        dbg!();
         let (space_messages, space_events) = manager_ref
             .apply_group_change_to_spaces(&message)
             .await
             .map_err(|err| GroupError::SyncSpaces(auth_message.id(), format!("{err:?}")))?;
 
+        dbg!();
         let mut messages = vec![message];
         let mut events = vec![auth_event];
         messages.extend(space_messages);
