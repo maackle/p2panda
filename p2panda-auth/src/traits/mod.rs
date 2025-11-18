@@ -25,7 +25,7 @@ pub trait IdentityHandle: Copy + Debug + PartialEq + Eq + StdHash {}
 /// Operations trigger changes of the group state and are usually sent in form of messages over the
 /// network. Each operation needs to be uniquely identifiable, preferably by a collision-resistant
 /// hash.
-pub trait OperationId: Copy + Debug + PartialEq + Eq + StdHash {}
+pub trait OperationId: Copy + Debug + PartialEq + Eq + StdHash + std::fmt::Display {}
 
 /// Conditions associated with an actors access level.
 pub trait Conditions: Clone + Debug + PartialEq + PartialOrd {}

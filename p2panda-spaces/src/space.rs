@@ -90,8 +90,7 @@ where
         mut initial_members: Vec<(ActorId, Access<C>)>,
     ) -> Result<(Self, Vec<M>, Vec<Event<ID, C>>), SpaceError<ID, S, K, F, M, C, RS>> {
         let my_id = manager_ref.id();
-        dbg!();
-
+        
         // Get the global auth state. We use this state in a following step to initialise the
         // space state and we don't want it to contain the group for the space itself.
         let auth_y = {
@@ -104,15 +103,19 @@ where
             initial_members.push((my_id, Access::manage()));
         }
 
-        dbg!();
+                let manager_clone = manager_ref.clone();
 
+        dbg!(&size_of::<Manager<ID, S, K, F, M, C, RS>>());
+        dbg!(&size_of_val(&manager_clone));
+
+        let fut = Group::create(manager_clone, initial_members);
+        dbg!(&size_of_val(&fut));
+
+        
         // Create new group for the space.
-        let (group, mut messages, auth_event) = Group::create(manager_ref.clone(), initial_members)
-            .await
-            .map_err(SpaceError::Group)?;
+        let (group, mut messages, auth_event) = fut.await.map_err(SpaceError::Group)?;
 
-        dbg!();
-        // Instantiate new space state from existing global auth state.
+                // Instantiate new space state from existing global auth state.
         let y = Self::state_from_auth(
             manager_ref.clone(),
             auth_y,
@@ -122,15 +125,13 @@ where
         )
         .await?;
 
-        dbg!();
-        // Apply the "create" auth message to the space state.
+                // Apply the "create" auth message to the space state.
         //
         // We know the first message is the auth message.
         let (space_message, space_event) =
             Self::process_auth_message(manager_ref.clone(), y, &messages[0]).await?;
 
-        dbg!();
-        messages.push(space_message.expect("creating space results in message"));
+                messages.push(space_message.expect("creating space results in message"));
         let space_event = space_event.expect("creating space results in event");
 
         Ok((
@@ -181,24 +182,20 @@ where
         mut y: SpaceState<ID, M, C>,
         auth_message: &M,
     ) -> Result<(Option<M>, Option<Event<ID, C>>), SpaceError<ID, S, K, F, M, C, RS>> {
-        dbg!();
-        if y.auth_y.inner.operations.contains_key(&auth_message.id()) {
+                if y.auth_y.inner.operations.contains_key(&auth_message.id()) {
             return Ok((None, None));
         }
 
         // Get current space members.
         let current_members = secret_members(y.auth_y.members(y.group_id));
 
-        dbg!();
-        // Process auth message on local auth state.
+                // Process auth message on local auth state.
         let auth_message = AuthMessage::from_forged(auth_message);
-        y.auth_y = AuthGroup::process(y.auth_y, &auth_message).map_err(SpaceError::AuthGroup)?;
-        dbg!();
-
+                y.auth_y = AuthGroup::process(y.auth_y, &auth_message).map_err(SpaceError::AuthGroup)?;
+        
         // Get next space members.
         let next_members = secret_members(y.auth_y.members(y.group_id));
-        dbg!();
-
+        
         // Process the change of membership on encryption the context.
         let (encryption_y, direct_messages) = if current_members != next_members {
             let manager = manager_ref.inner.read().await;
@@ -213,8 +210,7 @@ where
         } else {
             (y.encryption_y, vec![])
         };
-        dbg!();
-        y.encryption_y = encryption_y;
+                y.encryption_y = encryption_y;
 
         // Construct space message and sign it in the forge (K)
         let dependencies: Vec<OperationId> = y.encryption_y.orderer.heads().to_vec();
@@ -230,8 +226,7 @@ where
             let mut manager = manager_ref.inner.write().await;
             manager.identity.forge(args).await?
         };
-        dbg!();
-
+        
         // Update space state and persist it.
         {
             let manager = manager_ref.inner.write().await;
@@ -247,8 +242,7 @@ where
                 .map_err(SpaceError::SpacesStore)?;
         }
 
-        dbg!();
-        // If current and next member sets are equal it indicates that the space is not affected
+                // If current and next member sets are equal it indicates that the space is not affected
         // by this auth change. This can be because the space wasn't created yet, or the auth
         // change simply does not effect the members of this space. In either case we don't want
         // to emit any membership change event.
@@ -264,8 +258,7 @@ where
             next_members,
         );
 
-        dbg!();
-        Ok((Some(space_message), Some(space_event)))
+                Ok((Some(space_message), Some(space_event)))
     }
 
     /// Process a space message along with it's relevant auth message (if required).
@@ -568,10 +561,8 @@ where
         auth_message: &M,
     ) -> Result<(Option<M>, Option<Event<ID, C>>), SpaceError<ID, S, K, F, M, C, RS>> {
         // If this space already processed this auth message then skip it.
-        dbg!();
-        let y = self.state().await?;
-        dbg!();
-        if y.auth_y.inner.operations.contains_key(&auth_message.id()) {
+                let y = self.state().await?;
+                if y.auth_y.inner.operations.contains_key(&auth_message.id()) {
             return Ok((None, None));
         }
 
@@ -582,8 +573,7 @@ where
             .iter()
             .any(|(member, access)| *member == my_id && access > &Access::pull());
 
-        dbg!();
-        if is_reader {
+                if is_reader {
             return Space::process_auth_message(self.manager.clone(), y, auth_message).await;
         }
 
@@ -594,24 +584,19 @@ where
     pub(crate) async fn state(
         &self,
     ) -> Result<SpaceState<ID, M, C>, SpaceError<ID, S, K, F, M, C, RS>> {
-        dbg!();
-        let manager = self.manager.inner.read().await;
-        dbg!();
-        let mut space_y = manager
+                let manager = self.manager.inner.read().await;
+                let mut space_y = manager
             .store
             .space(&self.id)
             .await
             .map_err(SpaceError::SpacesStore)?
             .ok_or(SpaceError::UnknownSpace(self.id))?;
-        dbg!();
-
+        
         // Inject latest key material to space DCGKA state.
         let key_manager_y = manager.identity.key_manager().await?;
-        dbg!();
-
+        
         let key_registry_y = manager.identity.key_registry().await?;
-        dbg!();
-
+        
         space_y.encryption_y.dcgka.my_keys = key_manager_y;
         space_y.encryption_y.dcgka.pki = key_registry_y;
 

@@ -34,16 +34,14 @@ where
         ID: SpaceId,
         M: AuthoredMessage + SpacesMessage<ID, C>,
     {
-        dbg!();
-        let SpacesArgs::Auth {
+                let SpacesArgs::Auth {
             control_message,
             auth_dependencies,
         } = message.args()
         else {
             panic!("unexpected message type")
         };
-        dbg!();
-        AuthMessage::Forged {
+                AuthMessage::Forged {
             author: message.author(),
             operation_id: message.id(),
             args: AuthArgs {

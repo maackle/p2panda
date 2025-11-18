@@ -441,11 +441,9 @@ where
         let control_message = operation.payload();
         let dependencies = HashSet::from_iter(operation.dependencies().clone());
         let group_id = control_message.group_id();
-        dbg!();
         let rebuild_required =
             RS::rebuild_required(&y.inner, operation).map_err(GroupCrdtError::Resolver)?;
 
-        dbg!();
         // Validate that the author of this operation had the required access rights at the point
         // in the auth graph which they claim as their last state (the state at "dependencies").
         // It could be that they had access at this point but concurrent changes (which we know
@@ -453,20 +451,16 @@ where
         // we want to catch malicious or invalid operations which should _never_ be attached to
         // the graph.
         y = GroupCrdt::validate(y, operation)?;
-        dbg!();
         y = Self::add_operation(y, operation);
-        dbg!();
 
         if rebuild_required {
             y.inner = RS::process(y.inner).map_err(GroupCrdtError::Resolver)?;
             return Ok(y);
         }
 
-        dbg!();
         // We don't need to check the state change result as validation was already performed
         // above.
         let mut groups_y = y.inner.state_at(&dependencies)?;
-        dbg!();
         groups_y = apply_action(
             groups_y,
             group_id,
@@ -477,7 +471,6 @@ where
         )
         .state()
         .to_owned();
-        dbg!();
 
         y.inner.states.insert(operation_id, groups_y);
 
@@ -500,7 +493,6 @@ where
         y: GroupCrdtState<ID, OP, C, ORD>,
         operation: &ORD::Operation,
     ) -> Result<GroupCrdtState<ID, OP, C, ORD>, GroupCrdtError<ID, OP, C, RS, ORD>> {
-        dbg!();
         // Detect already processed operations.
         if y.inner.operations.contains_key(&operation.id()) {
             // The operation has already been processed.
@@ -509,7 +501,6 @@ where
                 operation.payload().group_id(),
             ));
         }
-        dbg!();
         // Adding a group as a manager of another group is currently not
         // supported.
         //
@@ -524,7 +515,6 @@ where
             }
             _ => (),
         };
-        dbg!();
 
         let last_graph = y.inner.graph.clone();
         let last_ignore = y.inner.ignore.clone();
@@ -533,7 +523,6 @@ where
 
         let dependencies = HashSet::from_iter(operation.dependencies().clone());
 
-        dbg!();
         // If this operation is concurrent to our current local state we need to rebuild the graph
         // to the operations' claimed dependencies in order to validate it correctly.
         let temp_y = if y.inner.heads() != dependencies {
@@ -561,15 +550,12 @@ where
                 temp_y.inner.graph.remove_node(*node);
             }
 
-            dbg!();
             temp_y.inner = RS::process(temp_y.inner).map_err(GroupCrdtError::Resolver)?;
-            dbg!();
             temp_y
         } else {
             y
         };
 
-        dbg!();
         // Detect if this operation would cause a nested group cycle.
         if temp_y.inner.would_create_cycle(operation) {
             let parent_group = operation.payload().group_id();
@@ -588,7 +574,6 @@ where
                 operation.id(),
             ));
         }
-        dbg!();
 
         // Apply the operation onto the temporary state.
         let result = apply_action(
@@ -599,7 +584,6 @@ where
             &operation.payload().action,
             &temp_y.inner.ignore,
         );
-        dbg!();
 
         match result {
             StateChangeResult::Ok { state } => state,
@@ -614,7 +598,6 @@ where
             }
         };
 
-        dbg!();
         let mut y = temp_y;
         y.inner.graph = last_graph;
         y.inner.ignore = last_ignore;
