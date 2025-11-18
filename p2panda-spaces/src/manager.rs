@@ -456,9 +456,7 @@ where
         let mut messages = vec![];
         let mut events = vec![];
         for id in space_ids {
-            dbg!(&id);
             let (message, event) = self.apply_group_change_to_space(auth_message, id).await?;
-            dbg!(&id);
             if let Some(message) = message {
                 messages.push(message);
             }
