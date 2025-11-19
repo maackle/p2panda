@@ -647,9 +647,9 @@ where
     let members_y = if action.is_create() {
         GroupMembersState::default()
     } else {
-        groups_y
-            .remove(&group_id)
-            .expect("group already present in states map")
+        groups_y.remove(&group_id).unwrap_or_else(|| {
+            panic!("group not present in states map: group_id={group_id:?}, op={id}")
+        })
     };
 
     if filter.contains(&id) {
