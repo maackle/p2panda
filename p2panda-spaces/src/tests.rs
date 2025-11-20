@@ -2119,16 +2119,29 @@ async fn process_operation_from_expired_member() {
     assert!(bob.manager.process(&messages[1]).await.is_err());
 }
 
+async fn process(
+    manager: &crate::test_utils::TestManager,
+    messages: &[crate::test_utils::TestMessage],
+) {
+    for message in messages {
+        manager.persist_message(&message).await.unwrap();
+        manager.process(&message).await.unwrap();
+    }
+}
+
 #[tokio::test]
 async fn nested_group_bubble() {
     let alice = TestPeer::new(0).await;
     let bob = <TestPeer>::new(1).await;
+    let bobbi = <TestPeer>::new(11).await;
 
     let alice_id = alice.manager.id();
     let bob_id = bob.manager.id();
+    let bobbi_id = bobbi.manager.id();
 
     let alice_manager = alice.manager.clone();
     let bob_manager = bob.manager.clone();
+    let bobbi_manager = bobbi.manager.clone();
 
     // Manually register all key bundles on alice.
 
@@ -2142,30 +2155,109 @@ async fn nested_group_bubble() {
         .await
         .unwrap();
 
-    let (ga, alice_msgs, _) = alice_manager
-        .create_group(&[(alice_id, Access::write())])
+    bob_manager
+        .register_member(&bobbi_manager.me().await.unwrap())
+        .await
+        .unwrap();
+    bobbi_manager
+        .register_member(&bob_manager.me().await.unwrap())
         .await
         .unwrap();
 
-    let (gb, bob_msgs, _) = bob_manager
-        .create_group(&[(bob_id, Access::write())])
-        .await
-        .unwrap();
+    let ga = {
+        let (ga, msgs, _) = alice_manager
+            .create_group(&[(alice_id, Access::manage())])
+            .await
+            .unwrap();
+        process(&bob_manager, &msgs).await;
+        ga
+    };
 
-    for m in alice_msgs.iter() {
-        bob_manager.persist_message(&m).await.unwrap();
-        bob_manager.process(m).await.unwrap();
+    let gb = {
+        let (gb, msgs, _) = bob_manager
+            .create_group(&[(bob_id, Access::manage())])
+            .await
+            .unwrap();
+        process(&alice_manager, &msgs).await;
+
+        let (msgs, _) = bob_manager
+            .group(gb.id())
+            .await
+            .unwrap()
+            .unwrap()
+            .add(bobbi_id, Access::manage())
+            .await
+            .unwrap();
+        process(&alice_manager, &msgs).await;
+
+        gb
+    };
+
+    {
+        alice_manager
+            .register_member(&bobbi_manager.me().await.unwrap())
+            .await
+            .unwrap();
+        bobbi_manager
+            .register_member(&alice_manager.me().await.unwrap())
+            .await
+            .unwrap();
     }
 
-    for m in bob_msgs.iter() {
-        alice_manager.persist_message(&m).await.unwrap();
-        alice_manager.process(m).await.unwrap();
+    {
+        let (_, msgs, _) = alice_manager
+            .create_space(
+                0,
+                &[
+                    (alice_id.into(), Access::manage()),
+                    (ga.id(), Access::write()),
+                ],
+            )
+            .await
+            .unwrap();
+        process(&bob_manager, &msgs).await;
+
+        // let (msgs, _) = alice_manager.repair_spaces(&vec![0]).await.unwrap();
+        // process(&bob_manager, &msgs).await;
     }
 
-    alice_manager
-        .create_space(0, &[(ga.id(), Access::write()), (gb.id(), Access::write())])
-        .await
-        .unwrap();
+    {
+        let space = alice_manager.space(0).await.unwrap().unwrap();
+        let (msgs, _) = space.add(bob_id.into(), Access::manage()).await.unwrap();
+        process(&bob_manager, &msgs).await;
+        let (msgs, _) = space.add(gb.id(), Access::write()).await.unwrap();
+        process(&bob_manager, &msgs).await;
+    }
+
+    let expected = vec![
+        (alice_id.into(), Access::manage()),
+        (bob_id.into(), Access::manage()),
+        (bobbi_id.into(), Access::write()),
+    ];
+
+    assert_eq!(
+        alice_manager
+            .space(0)
+            .await
+            .unwrap()
+            .unwrap()
+            .members()
+            .await
+            .unwrap(),
+        expected
+    );
+
+    assert_eq!(
+        bob_manager
+            .space(0)
+            .await
+            .unwrap()
+            .unwrap()
+            .members()
+            .await
+            .unwrap(),
+        expected
+    );
 }
 
 #[tokio::test]
