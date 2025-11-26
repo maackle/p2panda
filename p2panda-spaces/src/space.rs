@@ -105,7 +105,7 @@ where
 
         let manager_clone = manager_ref.clone();
 
-        let fut = Group::create(manager_clone, initial_members);
+        let fut = Group::create(manager_clone, initial_members, None);
 
         // Create new group for the space.
         let (group, mut messages, auth_event) = fut.await.map_err(SpaceError::Group)?;

@@ -97,6 +97,12 @@ where
         .await
     }
 
+    pub async fn random_id(&self) -> Result<ActorId, p2panda_encryption::RngError> {
+        let manager = self.inner.read().await;
+        let private_key = p2panda_core::PrivateKey::from_bytes(&manager.rng.random_array()?);
+        Ok(private_key.public_key().into())
+    }
+
     /// Instantiate a new manager with custom configuration.
     #[allow(clippy::result_large_err)]
     pub async fn new_with_config(
@@ -203,9 +209,34 @@ where
         (Group<ID, S, K, F, M, C, RS>, Vec<M>, Event<ID, C>),
         ManagerError<ID, S, K, F, M, C, RS>,
     > {
-        let (group, messages, event) = Group::create(self.clone(), initial_members.to_owned())
-            .await
-            .map_err(ManagerError::Group)?;
+        let (group, messages, event) =
+            Group::create(self.clone(), initial_members.to_owned(), None)
+                .await
+                .map_err(ManagerError::Group)?;
+
+        Ok((group, messages, event))
+    }
+
+    /// Create a new group containing initial members with associated access levels.
+    ///
+    /// It is possible to create a group where the creator is not an initial member or is a member
+    /// without manager rights. If this is done then after creation no further change of the group
+    /// membership would be possible.
+    ///
+    /// Returns messages for replication to other instances and events which inform users of any
+    /// state changes which occurred.
+    pub async fn create_group_with_id(
+        &self,
+        initial_members: &[(ActorId, Access<C>)],
+        group_id: ActorId,
+    ) -> Result<
+        (Group<ID, S, K, F, M, C, RS>, Vec<M>, Event<ID, C>),
+        ManagerError<ID, S, K, F, M, C, RS>,
+    > {
+        let (group, messages, event) =
+            Group::create(self.clone(), initial_members.to_owned(), Some(group_id))
+                .await
+                .map_err(ManagerError::Group)?;
 
         Ok((group, messages, event))
     }

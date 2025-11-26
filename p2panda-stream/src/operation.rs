@@ -63,7 +63,7 @@ where
                             // We observe a gap in the log and therefore can't validate the
                             // backlink yet.
                             OperationError::SeqNumNonIncremental(expected, given) => {
-                                return Ok(IngestResult::Retry(operation.header, operation.body, header_bytes, given - expected))
+                                return Ok(IngestResult::Retry(operation.header, operation.body, header_bytes, given as i64 - expected as i64))
                             }
                             _ => unreachable!("other error cases have been handled before"),
                         }
@@ -75,7 +75,7 @@ where
                         operation.header.clone(),
                         operation.body.clone(),
                         header_bytes,
-                        operation.header.seq_num,
+                        operation.header.seq_num as i64,
                     ));
                 }
             }
@@ -118,7 +118,7 @@ pub enum IngestResult<E> {
     ///
     /// The number indicates how many operations we are lacking before we can attempt validation
     /// again.
-    Retry(Header<E>, Option<Body>, Vec<u8>, u64),
+    Retry(Header<E>, Option<Body>, Vec<u8>, i64),
 }
 
 /// Errors which can occur due to invalid operations or critical storage failures.
@@ -140,7 +140,7 @@ pub enum IngestError {
     /// Some implementations might optimistically retry to ingest operations which arrived
     /// out-of-order. This error comes up when all given attempts have been exhausted.
     #[error("too many attempts to ingest out-of-order operation ({0} behind in log)")]
-    MaxAttemptsReached(u64),
+    MaxAttemptsReached(i64),
 }
 
 #[cfg(test)]
