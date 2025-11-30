@@ -18,7 +18,7 @@ pub enum GroupMember<ID> {
 
 impl<ID> GroupMember<ID>
 where
-    ID: Copy,
+    ID: Copy + std::fmt::Display,
 {
     /// Return the ID of a group member.
     pub fn id(&self) -> ID {
@@ -39,6 +39,18 @@ where
     /// Return true if this group member is an individual.
     pub fn is_individual(&self) -> bool {
         !self.is_group()
+    }
+}
+
+impl<ID> std::fmt::Display for GroupMember<ID>
+where
+    ID: std::fmt::Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GroupMember::Individual(id) => write!(f, "{}", id),
+            GroupMember::Group(id) => write!(f, "{}", id),
+        }
     }
 }
 

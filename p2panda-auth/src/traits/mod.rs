@@ -18,7 +18,7 @@ pub use resolver::Resolver;
 ///
 /// Note that this needs to be unique within a group, can be a username, number or preferably a
 /// long byte string.
-pub trait IdentityHandle: Copy + Debug + PartialEq + Eq + StdHash {}
+pub trait IdentityHandle: Copy + Debug + PartialEq + Eq + StdHash + std::fmt::Display {}
 
 /// Identifier for each group membership operation.
 ///
