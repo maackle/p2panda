@@ -24,6 +24,7 @@ default = ["prune"]
 prune = []
 
 [dependencies]
+aliased-id = { git = "https://github.com/maackle/aliased-id.git" }
 arbitrary = { version = "1.4.1", optional = true, features = ["derive"] }
 blake3 = "1.8.1"
 ciborium = "0.2.2"

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 #![doc = include_str!("../README.md")]
+mod aliased;
 mod auth;
 mod config;
 mod credentials;
@@ -11,6 +12,7 @@ pub mod identity;
 pub mod manager;
 mod member;
 mod message;
+pub mod polestar;
 pub mod space;
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;

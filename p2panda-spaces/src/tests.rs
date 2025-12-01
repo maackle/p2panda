@@ -3,6 +3,7 @@
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use aliased_id::AliasedId;
 use assert_matches::assert_matches;
 use p2panda_auth::Access;
 use p2panda_auth::group::GroupMember;
@@ -2131,13 +2132,22 @@ async fn process(
 
 #[tokio::test]
 async fn nested_group_bubble() {
+    let filter = tracing_subscriber::EnvFilter::try_new("info").unwrap();
+    tracing_subscriber::fmt::fmt()
+        .with_thread_names(false)
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_env_filter(filter)
+        .init();
+
     let alice = TestPeer::new(0).await;
     let bob = <TestPeer>::new(1).await;
     let bobbi = <TestPeer>::new(11).await;
 
-    let alice_id = alice.manager.id();
-    let bob_id = bob.manager.id();
-    let bobbi_id = bobbi.manager.id();
+    let alice_id = alice.manager.id().aliased("alice");
+    let bob_id = bob.manager.id().aliased("bob");
+    let bobbi_id = bobbi.manager.id().aliased("bobbi");
 
     let alice_manager = alice.manager.clone();
     let bob_manager = bob.manager.clone();

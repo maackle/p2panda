@@ -658,6 +658,8 @@ where
         return StateChangeResult::Filtered { state: groups_y };
     }
 
+    crate::polestar::emit_event(actor, crate::polestar::Action::Group(action.clone()));
+
     let result = match action.clone() {
         GroupAction::Add { member, access, .. } => state::add(
             members_y.clone(),

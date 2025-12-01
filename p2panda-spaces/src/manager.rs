@@ -292,7 +292,9 @@ where
             .identity
             .register_member(member)
             .await
-            .map_err(ManagerError::IdentityManager)
+            .map_err(ManagerError::IdentityManager)?;
+
+        Ok(())
     }
 
     /// Check if my latest key bundle has expired.

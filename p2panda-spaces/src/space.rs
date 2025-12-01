@@ -319,7 +319,9 @@ where
                 direct_messages: vec![],
                 space_dependencies,
             };
-            let message = manager.identity.forge(args).await?;
+            let message = manager.identity.forge(args.clone()).await?;
+
+            crate::polestar::emit_event(manager_ref.id(), crate::polestar::Action::Space(args));
 
             space_dependencies = vec![message.id()];
             messages.push(message);
