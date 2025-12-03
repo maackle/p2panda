@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use named_id::AnyNameable;
+use named_id::derive::Nameables;
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use crate::traits::IdentityHandle;
 ///
 /// The `Group` variant can be used to express nested group relations. In both cases, the member
 /// identifier is the same generic ID.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Nameables)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum GroupMember<ID> {
     Individual(ID),
@@ -46,12 +46,3 @@ where
 }
 
 impl<ID> IdentityHandle for GroupMember<ID> where ID: IdentityHandle {}
-
-impl<ID: Debug + Clone + 'static> named_id::Nameables for GroupMember<ID> {
-    fn nameables(&self) -> Vec<AnyNameable> {
-        match self {
-            GroupMember::Individual(id) => vec![AnyNameable::new(id.clone())],
-            GroupMember::Group(id) => vec![AnyNameable::new(id.clone())],
-        }
-    }
-}

@@ -2181,6 +2181,7 @@ async fn nested_group_bubble() {
             .await
             .unwrap();
         process(&bob_manager, &msgs).await;
+        ga.id().with_name("ga");
         ga
     };
 
@@ -2200,7 +2201,7 @@ async fn nested_group_bubble() {
             .await
             .unwrap();
         process(&alice_manager, &msgs).await;
-
+        gb.id().with_name("gb");
         gb
     };
 

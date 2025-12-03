@@ -24,7 +24,7 @@ impl SpaceId for TestSpaceId {}
 
 pub type TestPeerId = u8;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, named_id::derive::Nameables)]
 pub struct TestConditions {}
 
 impl Conditions for TestConditions {}

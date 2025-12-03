@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 
+use named_id::derive::Nameables;
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +11,7 @@ use crate::traits::Conditions;
 
 /// The four basic access levels which can be assigned to an actor. Greater access levels are
 /// assumed to also contain all lower ones.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Nameables)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum AccessLevel {
     /// Permission to sync a data set.
@@ -35,7 +36,7 @@ pub enum AccessLevel {
 /// For example, a condition to model access boundaries using paths could be introduced where
 /// having access to "/public" gives you access to "/public/stuff" and "/public/other/stuff" but
 /// not "/private" or "/private/stuff".
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Nameables)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub struct Access<C = ()> {
     pub conditions: Option<C>,

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use named_id::derive::Nameables;
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +8,7 @@ use crate::Access;
 use crate::group::GroupMember;
 
 /// Actions for creating groups and modifying group membership.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Nameables)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum GroupAction<ID, C> {
     Create {
