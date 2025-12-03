@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::fmt::{Display, Formatter};
+use std::fmt::Debug;
 
+use named_id::AnyNameable;
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
 use crate::traits::IdentityHandle;
-
-use aliased_id::AliasedId;
 
 /// A group member which can be a single individual or another group.
 ///
@@ -48,14 +47,11 @@ where
 
 impl<ID> IdentityHandle for GroupMember<ID> where ID: IdentityHandle {}
 
-impl<ID> Display for GroupMember<ID>
-where
-    ID: Display + AliasedId,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<ID: Debug + Clone + 'static> named_id::Nameables for GroupMember<ID> {
+    fn nameables(&self) -> Vec<AnyNameable> {
         match self {
-            GroupMember::Individual(id) => write!(f, "{}", id.alias()),
-            GroupMember::Group(id) => write!(f, "{}", id.alias()),
+            GroupMember::Individual(id) => vec![AnyNameable::new(id.clone())],
+            GroupMember::Group(id) => vec![AnyNameable::new(id.clone())],
         }
     }
 }

@@ -3,8 +3,9 @@
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use aliased_id::AliasedId;
 use assert_matches::assert_matches;
+use named_id::*;
+
 use p2panda_auth::Access;
 use p2panda_auth::group::GroupMember;
 use p2panda_encryption::Rng;
@@ -2145,9 +2146,9 @@ async fn nested_group_bubble() {
     let bob = <TestPeer>::new(1).await;
     let bobbi = <TestPeer>::new(11).await;
 
-    let alice_id = alice.manager.id().aliased("alice");
-    let bob_id = bob.manager.id().aliased("bob");
-    let bobbi_id = bobbi.manager.id().aliased("bobbi");
+    let alice_id = alice.manager.id().with_name("alice");
+    let bob_id = bob.manager.id().with_name("bob");
+    let bobbi_id = bobbi.manager.id().with_name("bobbi");
 
     let alice_manager = alice.manager.clone();
     let bob_manager = bob.manager.clone();
