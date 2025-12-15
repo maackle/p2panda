@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
+use named_id::RenameAll;
 use serde::{Deserialize, Serialize};
 
 use crate::traits::{GroupMembership, IdentityHandle, OperationId};
@@ -26,7 +27,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 pub struct TestDgmState<ID, OP>
 where
     ID: IdentityHandle,
@@ -38,8 +39,8 @@ where
 
 impl<ID, OP> GroupMembership<ID, OP> for TestDgm<ID, OP>
 where
-    ID: IdentityHandle + Serialize + for<'a> Deserialize<'a>,
-    OP: OperationId + Serialize + for<'a> Deserialize<'a>,
+    ID: IdentityHandle + Serialize + for<'a> Deserialize<'a> + named_id::Rename,
+    OP: OperationId + Serialize + for<'a> Deserialize<'a> + named_id::Rename,
 {
     type State = TestDgmState<ID, OP>;
 

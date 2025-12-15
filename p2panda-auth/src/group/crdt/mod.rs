@@ -648,7 +648,11 @@ where
         GroupMembersState::default()
     } else {
         groups_y.remove(&group_id).unwrap_or_else(|| {
-            panic!("group not present in states map: group_id={group_id}, op={id}")
+            panic!(
+                "group not present in states map: group_id={:?}, op={:?}",
+                group_id.renamed(),
+                id.renamed()
+            )
         })
     };
 
@@ -656,6 +660,8 @@ where
         groups_y.insert(group_id, members_y);
         return StateChangeResult::Filtered { state: groups_y };
     }
+
+    crate::polestar::emit_event(actor, crate::polestar::Action::Group(action.clone()));
 
     let result = match action.clone() {
         GroupAction::Add { member, access, .. } => state::add(

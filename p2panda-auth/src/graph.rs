@@ -141,7 +141,7 @@ mod tests {
     use crate::graph::concurrent_bubbles;
     use crate::traits::OperationId;
 
-    impl OperationId for &str {}
+    impl OperationId for &'static str {}
 
     #[test]
     fn test_linear_chain_no_concurrency() {

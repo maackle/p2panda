@@ -7,6 +7,7 @@ mod store;
 
 use std::fmt::Debug;
 
+use named_id::Rename;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -15,4 +16,4 @@ pub use message::{AuthoredMessage, SpacesMessage};
 pub use store::{AuthStore, KeyRegistryStore, KeySecretStore, MessageStore, SpacesStore};
 
 /// Trait representing the identifier of a space.
-pub trait SpaceId: Debug + Copy + Eq + PartialEq + DeserializeOwned + Serialize {}
+pub trait SpaceId: Debug + Copy + Eq + PartialEq + DeserializeOwned + Serialize + Rename {}

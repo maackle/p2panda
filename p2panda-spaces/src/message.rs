@@ -2,6 +2,7 @@
 
 use std::fmt::Debug;
 
+use named_id::RenameAll;
 use p2panda_encryption::data_scheme::GroupSecretId;
 use p2panda_encryption::{crypto::xchacha20::XAeadNonce, key_bundle::LongTermKeyBundle};
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{ActorId, AuthControlMessage, EncryptionDirectMessage, OperationId};
 
 /// Enum representing all possible message types.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, RenameAll)]
 pub enum SpacesArgs<ID, C> {
     /// System message, contains key bundle of the given author.
     ///
@@ -69,9 +70,11 @@ pub enum SpacesArgs<ID, C> {
         space_dependencies: Vec<OperationId>,
 
         /// Used key id for AEAD.
+        #[named_id(skip)]
         group_secret_id: GroupSecretId,
 
         /// Used nonce for AEAD.
+        #[named_id(skip)]
         nonce: XAeadNonce,
 
         /// Encrypted application data.

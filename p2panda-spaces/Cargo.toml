@@ -18,9 +18,12 @@ all-features = true
 workspace = true
 
 [features]
+default = ["polestar"]
 test_utils = ["p2panda-auth/test_utils", "p2panda-encryption/test_utils"]
+polestar = ["p2panda-auth/polestar"]
 
 [dependencies]
+named-id = { git = "https://github.com/maackle/named-id.git" }
 p2panda-auth = { path = "../p2panda-auth", version = "0.4.0", features = [
   "serde",
 ], default-features = false }
@@ -33,6 +36,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 thiserror = "2.0.12"
 tokio = { version = "1.46.1", features = ["sync"] }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"

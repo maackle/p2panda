@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 
+use named_id::RenameAll;
 use p2panda_encryption::traits::GroupMembership;
 use serde::{Deserialize, Serialize};
 
@@ -14,10 +15,10 @@ use crate::types::{ActorId, OperationId};
 /// Placeholder for DGM implementation which satisfies required trait interfaces in
 /// p2panda-encryption. Most methods perform no actual actions as group management is handled by
 /// p2panda-auth.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, RenameAll)]
 pub struct EncryptionGroupMembership {}
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, RenameAll)]
 pub struct EncryptionMembershipState {
     pub(crate) members: HashSet<ActorId>,
 }

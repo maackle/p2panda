@@ -20,6 +20,7 @@ use std::str::FromStr;
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::Arbitrary;
+use named_id::{Nameable, Shortener};
 use thiserror::Error;
 
 /// The length of a BLAKE3 hash in bytes.
@@ -144,6 +145,15 @@ impl<'a> Arbitrary<'a> for Hash {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let bytes = <[u8; HASH_LEN] as Arbitrary>::arbitrary(u)?;
         Ok(Hash::from_bytes(bytes))
+    }
+}
+
+impl Nameable for Hash {
+    fn shortener(&self) -> Option<Shortener> {
+        Some(Shortener {
+            prefix: "H",
+            length: 4,
+        })
     }
 }
 

@@ -80,3 +80,6 @@ pub mod test_utils;
 pub mod traits;
 
 pub use access::{Access, AccessLevel};
+
+#[cfg(feature = "polestar")]
+pub mod polestar;

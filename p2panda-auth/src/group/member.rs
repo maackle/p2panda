@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::fmt::Debug;
+
+use named_id::{Rename, RenameAll};
+
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +13,7 @@ use crate::traits::IdentityHandle;
 ///
 /// The `Group` variant can be used to express nested group relations. In both cases, the member
 /// identifier is the same generic ID.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, RenameAll)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum GroupMember<ID> {
     Individual(ID),
@@ -18,7 +22,7 @@ pub enum GroupMember<ID> {
 
 impl<ID> GroupMember<ID>
 where
-    ID: Copy + std::fmt::Display,
+    ID: Copy,
 {
     /// Return the ID of a group member.
     pub fn id(&self) -> ID {
@@ -44,13 +48,10 @@ where
 
 impl<ID> std::fmt::Display for GroupMember<ID>
 where
-    ID: std::fmt::Display,
+    ID: Rename + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            GroupMember::Individual(id) => write!(f, "{}", id),
-            GroupMember::Group(id) => write!(f, "{}", id),
-        }
+        write!(f, "{:?}", self.clone().renamed())
     }
 }
 

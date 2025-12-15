@@ -203,14 +203,14 @@ where
             "computing filter for bubble: {:?}",
             bubble
                 .iter()
-                .map(|id| id.to_string())
+                .map(|id| id.renamed().to_string())
                 .collect::<Vec<String>>()
         );
 
         // Iterate of all operations in the bubble.
         for operation_id in bubble {
             let operation = y.operations.get(operation_id).unwrap_or_else(|| {
-                panic!("operation not present in map: {}", operation_id);
+                panic!("operation not present in map: {}", operation_id.renamed());
             });
 
             // If this is not a remove or demote operation no action is required.
@@ -228,7 +228,7 @@ where
             let (mut concurrent, ..) = split_bubble(&y.graph, bubble, *operation_id);
             concurrent.retain(|id| {
                 let concurrent_operation = y.operations.get(id).unwrap_or_else(|| {
-                    panic!("operation not present in map: {}", id);
+                    panic!("operation not present in map: {}", id.renamed());
                 });
 
                 // RULE: Concurrent re-adds not allowed.
@@ -256,7 +256,7 @@ where
         // Iterate over every operation in the bubble.
         for id in bubble_graph.nodes() {
             let operation = operations.get(&id).unwrap_or_else(|| {
-                panic!("operation not present in map: {}", id);
+                panic!("operation not present in map: {}", id.renamed());
             });
             let author = operation.author();
             let group_id = operation.payload().group_id();

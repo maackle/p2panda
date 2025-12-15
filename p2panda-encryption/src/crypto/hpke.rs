@@ -7,12 +7,13 @@
 use hpke_rs::{Hpke, HpkePrivateKey, HpkePublicKey, Mode};
 use hpke_rs_crypto::types::{AeadAlgorithm, KdfAlgorithm, KemAlgorithm};
 use hpke_rs_rust_crypto::HpkeRustCrypto;
+use named_id::RenameAll;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::crypto::x25519::{PublicKey, SecretKey};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 pub struct HpkeCiphertext {
     /// Encrypted, shared secret generated for this transaction.
     #[serde(with = "serde_bytes")]

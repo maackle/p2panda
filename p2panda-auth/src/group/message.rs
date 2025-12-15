@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use named_id::RenameAll;
+
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +12,7 @@ use crate::group::GroupAction;
 /// There are two variants, one containing a group action and the ID of the group to which the
 /// action should be applied. The other is a special message which can be used to "undo" a message which
 /// has been previously applied to the group.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, RenameAll)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub struct GroupControlMessage<ID, C> {
     pub group_id: ID,

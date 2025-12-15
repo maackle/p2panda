@@ -26,6 +26,7 @@ use std::str::FromStr;
 #[cfg(feature = "arbitrary")]
 use arbitrary::Arbitrary;
 use ed25519_dalek::Signer;
+use named_id::{Nameable, Shortener};
 use rand::rngs::OsRng;
 use thiserror::Error;
 
@@ -183,6 +184,15 @@ impl fmt::Display for PublicKey {
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("PublicKey").field(self.0.as_bytes()).finish()
+    }
+}
+
+impl Nameable for crate::PublicKey {
+    fn shortener(&self) -> Option<Shortener> {
+        Some(Shortener {
+            prefix: "PK",
+            length: 4,
+        })
     }
 }
 

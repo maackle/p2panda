@@ -5,6 +5,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use std::sync::LazyLock;
 
+use named_id::RenameAll;
+use named_id::{Nameable, Shortener};
 use p2panda_auth::group::GroupCrdtInnerState as AuthInnerState;
 use p2panda_auth::traits::{
     Conditions, IdentityHandle as AuthIdentityHandle, OperationId as AuthOperationId, Resolver,
@@ -29,7 +31,9 @@ pub const ACTOR_ID_SIZE: usize = PUBLIC_KEY_LEN;
 pub const OPERATION_ID_SIZE: usize = HASH_LEN;
 
 /// Identifier for an actor.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, RenameAll,
+)]
 pub struct ActorId(pub(crate) PublicKey);
 
 impl AuthIdentityHandle for ActorId {}
@@ -58,6 +62,10 @@ impl ActorId {
                 .expect("can create public key from constant bytes")
         });
         Self(*PLACEHOLDER_PUBLIC_KEY)
+    }
+
+    pub fn with_name(self, name: &str) -> Self {
+        Self(self.0.with_name(name))
     }
 }
 
@@ -140,6 +148,15 @@ impl OperationId {
 impl Display for OperationId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl Nameable for OperationId {
+    fn shortener(&self) -> Option<Shortener> {
+        Some(Shortener {
+            prefix: "OP",
+            length: 4,
+        })
     }
 }
 

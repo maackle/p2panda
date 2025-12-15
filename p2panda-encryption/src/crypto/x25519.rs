@@ -64,6 +64,15 @@ impl SecretKey {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, StdHash, Serialize, Deserialize)]
 pub struct PublicKey(#[serde(with = "serde_bytes")] [u8; PUBLIC_KEY_SIZE]);
 
+impl named_id::Nameable for PublicKey {
+    fn shortener(&self) -> Option<named_id::Shortener> {
+        Some(named_id::Shortener {
+            prefix: "PKX",
+            length: 4,
+        })
+    }
+}
+
 impl PublicKey {
     pub fn from_bytes(public_key: [u8; PUBLIC_KEY_SIZE]) -> Self {
         Self(public_key)

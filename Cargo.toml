@@ -16,3 +16,6 @@ members = [
 ]
 
 [workspace.lints.rust]
+
+[patch."https://github.com/maackle/named-id.git"]
+named-id = { path = "/home/michael/proj/named-id" }
