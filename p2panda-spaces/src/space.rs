@@ -323,7 +323,7 @@ where
             };
             let message = manager.identity.forge(args.clone()).await?;
 
-            crate::polestar::emit_event(manager_ref.id(), crate::polestar::Action::Space(args));
+            crate::emit_event!(manager_ref.id(), crate::polestar::Action::Space(args));
 
             space_dependencies = vec![message.id()];
             messages.push(message);

@@ -1,10 +1,7 @@
 use std::fmt::Debug;
 
-use crate::{
-    group::GroupAction,
-    traits::{Conditions, IdentityHandle},
-};
-use named_id::{Rename, RenameAll};
+use crate::group::GroupAction;
+use named_id::RenameAll;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, RenameAll)]
@@ -13,8 +10,14 @@ pub enum Action<ID, C> {
     Group(GroupAction<ID, C>),
 }
 
-pub(crate) fn emit_event<ID: IdentityHandle, C: Conditions>(author: ID, action: Action<ID, C>) {
-    tracing::info!("EMIT: {:?} {:?}", author.renamed(), action.renamed());
+#[macro_export]
+macro_rules! emit_event {
+    ($author:expr, $action:expr) => {{
+        use ::named_id::Rename;
+        let author = $author.renamed();
+        let action = $action.renamed();
+        tracing::info!(?author, ?action, module = "p2panda-auth", "EVENT");
+    }};
 }
 
 // pub enum GroupAction

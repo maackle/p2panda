@@ -3,20 +3,21 @@ use std::fmt::Debug;
 use named_id::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{ActorId, SpacesArgs};
+use crate::SpacesArgs;
 
 #[derive(Debug, Serialize, Deserialize, RenameAll)]
 pub enum Action<ID, C> {
     Space(SpacesArgs<ID, C>),
 }
 
-pub fn emit_event<ID, C>(author: ActorId, action: Action<ID, C>)
-where
-    ID: Rename,
-    C: Rename,
-    Action<ID, C>: Rename,
-{
-    tracing::info!("EMIT: {:?}", (author.renamed(), action.renamed()));
+#[macro_export]
+macro_rules! emit_event {
+    ($author:expr, $action:expr) => {{
+        use ::named_id::Rename;
+        let author = $author.renamed();
+        let action = $action.renamed();
+        tracing::info!(?author, ?action, module = "p2panda-spaces", "EVENT");
+    }};
 }
 
 // pub enum GroupAction

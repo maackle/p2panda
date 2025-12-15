@@ -2179,8 +2179,8 @@ async fn nested_group_bubble() {
             .create_group(&[(alice_id, Access::manage())])
             .await
             .unwrap();
-        process(&bob_manager, &msgs).await;
         ga.id().with_name("ga");
+        process(&bob_manager, &msgs).await;
         ga
     };
 
@@ -2189,6 +2189,7 @@ async fn nested_group_bubble() {
             .create_group(&[(bob_id, Access::manage())])
             .await
             .unwrap();
+        gb.id().with_name("gb");
         process(&alice_manager, &msgs).await;
 
         let (msgs, _) = bob_manager
@@ -2200,7 +2201,6 @@ async fn nested_group_bubble() {
             .await
             .unwrap();
         process(&alice_manager, &msgs).await;
-        gb.id().with_name("gb");
         gb
     };
 
@@ -2216,7 +2216,7 @@ async fn nested_group_bubble() {
     }
 
     {
-        let (_, msgs, _) = alice_manager
+        let (s, msgs, _) = alice_manager
             .create_space(
                 0,
                 &[
@@ -2226,6 +2226,7 @@ async fn nested_group_bubble() {
             )
             .await
             .unwrap();
+        s.group_id().await.unwrap().with_name("gs");
         process(&bob_manager, &msgs).await;
 
         // let (msgs, _) = alice_manager.repair_spaces(&vec![0]).await.unwrap();
