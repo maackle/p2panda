@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::convert::Infallible;
 use std::fmt::Debug;
 
+use named_id::Nameable;
 use p2panda_auth::Access;
 use p2panda_auth::traits::{Conditions, Operation};
 use p2panda_encryption::traits::GroupMessage;
@@ -317,7 +318,7 @@ where
             let args = SpacesArgs::SpaceMembership {
                 space_id: y.space_id,
                 group_id: y.group_id,
-                auth_message_id: operation.id(),
+                auth_message_id: operation.id().with_serial(),
                 direct_messages: vec![],
                 space_dependencies,
             };
@@ -325,7 +326,7 @@ where
 
             crate::emit_event!(manager_ref.id(), crate::polestar::Action::Space(args));
 
-            space_dependencies = vec![message.id()];
+            space_dependencies = vec![message.id().with_serial()];
             messages.push(message);
         }
         y.auth_y = auth_y;

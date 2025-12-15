@@ -42,7 +42,7 @@ impl EncryptionIdentityHandle for ActorId {}
 
 impl ActorId {
     pub fn from_bytes(bytes: &[u8; ACTOR_ID_SIZE]) -> Result<Self, ActorIdError> {
-        Ok(Self(PublicKey::from_bytes(bytes)?))
+        Ok(Self(PublicKey::from_bytes(bytes)?.with_serial()))
     }
 
     pub fn as_bytes(&self) -> &[u8; ACTOR_ID_SIZE] {

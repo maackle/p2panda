@@ -98,9 +98,10 @@ where
     }
 
     pub async fn random_id(&self) -> Result<ActorId, p2panda_encryption::RngError> {
+        use named_id::Nameable;
         let manager = self.inner.read().await;
         let private_key = p2panda_core::PrivateKey::from_bytes(&manager.rng.random_array()?);
-        Ok(private_key.public_key().into())
+        Ok(private_key.public_key().with_serial().into())
     }
 
     /// Instantiate a new manager with custom configuration.
