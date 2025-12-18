@@ -28,8 +28,8 @@ macro_rules! emit_event {
         use ::named_id::Rename;
         let event: SpacesEvent<_, _, _> = $event;
         let event = event.renamed();
-        println!("EVENT: {event:?}");
-        // tracing::info!(?event, module = "p2panda-spaces", "EVENT");
+        // println!("EVENT: {event:?}");
+        tracing::info!(?event, module = "p2panda-spaces", "EVENT");
     }};
 }
 

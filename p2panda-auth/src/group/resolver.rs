@@ -12,6 +12,7 @@ use crate::group::{
     AuthorityGraphs, GroupAction, GroupControlMessage, GroupCrdtInnerState, GroupMember,
     apply_action,
 };
+use crate::polestar::AuthEvent;
 use crate::traits::{Conditions, IdentityHandle, Operation, OperationId, Resolver};
 
 /// An implementation of `Resolver` trait which follows strong remove ruleset.  
@@ -276,6 +277,7 @@ where
     }
 
     /// Apply an operation to the auth state.
+    #[tracing::instrument(skip_all)]
     fn apply_operation(
         mut y: GroupCrdtInnerState<ID, OP, C, M>,
         operation_id: OP,
@@ -315,6 +317,13 @@ where
                 GroupMember::Individual(removed),
             )
         };
+
+        crate::emit_event!(AuthEvent::new(crate::polestar::Action::Group {
+            group_id: operation.payload().group_id(),
+            author: operation.author(),
+            action: operation.payload().action
+        }));
+
         y.states.insert(operation.id(), groups_y);
         y
     }

@@ -433,6 +433,7 @@ where
 
     /// Process an operation created locally or received from a remote peer.
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(skip_all)]
     pub fn process(
         mut y: GroupCrdtState<ID, OP, C, ORD>,
         operation: &ORD::Operation,
@@ -472,6 +473,12 @@ where
         )
         .state()
         .to_owned();
+
+        crate::emit_event!(AuthEvent::new(crate::polestar::Action::Group {
+            group_id,
+            author: actor,
+            action: control_message.action
+        }));
 
         y.inner.states.insert(operation_id, groups_y);
 
@@ -632,6 +639,7 @@ where
 }
 
 /// Apply an action to a single group state.
+#[tracing::instrument(skip_all)]
 pub(crate) fn apply_action<ID, OP, C>(
     mut groups_y: GroupStates<ID, C>,
     group_id: ID,
@@ -661,11 +669,6 @@ where
         groups_y.insert(group_id, members_y);
         return StateChangeResult::Filtered { state: groups_y };
     }
-
-    crate::emit_event!(AuthEvent::new(
-        actor,
-        crate::polestar::Action::Group(action.clone())
-    ));
 
     let result = match action.clone() {
         GroupAction::Add { member, access, .. } => state::add(
