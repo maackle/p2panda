@@ -2214,7 +2214,7 @@ async fn nested_group_bubble() {
     }
 
     {
-        let (s, msgs, _) = alice_manager
+        let (_, msgs, _) = alice_manager
             .create_space(
                 0,
                 &[

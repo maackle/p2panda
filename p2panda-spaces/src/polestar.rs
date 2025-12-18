@@ -6,17 +6,30 @@ use serde::{Deserialize, Serialize};
 use crate::SpacesArgs;
 
 #[derive(Debug, Serialize, Deserialize, RenameAll)]
-pub enum Action<ID, C> {
-    Space(SpacesArgs<ID, C>),
+pub struct SpacesEvent<ID, S, C> {
+    actor: ID,
+    action: Action<S, C>,
+}
+
+impl<ID, S, C> SpacesEvent<ID, S, C> {
+    pub fn new(actor: ID, action: Action<S, C>) -> Self {
+        Self { actor, action }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, RenameAll)]
+pub enum Action<S, C> {
+    Space(SpacesArgs<S, C>),
 }
 
 #[macro_export]
 macro_rules! emit_event {
-    ($author:expr, $action:expr) => {{
+    ($event:expr) => {{
         use ::named_id::Rename;
-        let author = $author.renamed();
-        let action = $action.renamed();
-        tracing::info!(?author, ?action, module = "p2panda-spaces", "EVENT");
+        let event: SpacesEvent<_, _, _> = $event;
+        let event = event.renamed();
+        println!("EVENT: {event:?}");
+        // tracing::info!(?event, module = "p2panda-spaces", "EVENT");
     }};
 }
 

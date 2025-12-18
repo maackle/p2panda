@@ -18,6 +18,7 @@ use crate::access::Access;
 use crate::group::{
     GroupAction, GroupControlMessage, GroupMember, GroupMembersState, GroupMembershipError,
 };
+use crate::polestar::AuthEvent;
 use crate::traits::{Conditions, IdentityHandle, Operation, OperationId, Orderer, Resolver};
 
 /// Max depth of group nesting allowed.
@@ -661,7 +662,10 @@ where
         return StateChangeResult::Filtered { state: groups_y };
     }
 
-    crate::emit_event!(actor, crate::polestar::Action::Group(action.clone()));
+    crate::emit_event!(AuthEvent::new(
+        actor,
+        crate::polestar::Action::Group(action.clone())
+    ));
 
     let result = match action.clone() {
         GroupAction::Add { member, access, .. } => state::add(

@@ -5,6 +5,18 @@ use named_id::RenameAll;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, RenameAll)]
+pub struct AuthEvent<ID, C> {
+    actor: ID,
+    action: Action<ID, C>,
+}
+
+impl<ID, C> AuthEvent<ID, C> {
+    pub fn new(actor: ID, action: Action<ID, C>) -> Self {
+        Self { actor, action }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, RenameAll)]
 pub enum Action<ID, C> {
     // Space(SpaceAction<ID>),
     Group(GroupAction<ID, C>),
@@ -12,11 +24,12 @@ pub enum Action<ID, C> {
 
 #[macro_export]
 macro_rules! emit_event {
-    ($author:expr, $action:expr) => {{
+    ($event:expr) => {{
         use ::named_id::Rename;
-        let author = $author.renamed();
-        let action = $action.renamed();
-        tracing::info!(?author, ?action, module = "p2panda-auth", "EVENT");
+        let event: AuthEvent<_, _> = $event;
+        let event = event.renamed();
+        println!("EVENT: {event:?}");
+        // tracing::info!(?event, module = "p2panda-auth", "EVENT");
     }};
 }
 

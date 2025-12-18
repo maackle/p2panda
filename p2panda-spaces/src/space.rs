@@ -23,6 +23,7 @@ use crate::group::{Group, GroupError};
 use crate::identity::IdentityError;
 use crate::manager::Manager;
 use crate::message::SpacesArgs;
+use crate::polestar::SpacesEvent;
 use crate::traits::{
     AuthStore, AuthoredMessage, Forge, KeyRegistryStore, KeySecretStore, MessageStore, SpaceId,
     SpacesMessage, SpacesStore,
@@ -324,7 +325,8 @@ where
             };
             let message = manager.identity.forge(args.clone()).await?;
 
-            crate::emit_event!(manager_ref.id(), crate::polestar::Action::Space(args));
+            let event = crate::polestar::Action::Space(args);
+            crate::emit_event!(SpacesEvent::new(manager_ref.id(), event));
 
             space_dependencies = vec![message.id().with_serial()];
             messages.push(message);
