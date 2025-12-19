@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::convert::Infallible;
 use std::fmt::Debug;
 
-use named_id::Nameable;
+use named_id::{Nameable, Rename};
 use p2panda_auth::Access;
 use p2panda_auth::traits::{Conditions, Operation};
 use p2panda_encryption::traits::GroupMessage;
@@ -337,6 +337,7 @@ where
 
     /// Handle messages which effect the space membership. Each of these messages contained a
     /// pointer to an auth message and the auth message is required here.
+    #[tracing::instrument(skip_all, fields(space_id = ?self.id().renamed(), group_id = ?self.manager.id().renamed()))]
     async fn handle_membership_message(
         &self,
         space_message: &M,
@@ -516,6 +517,7 @@ where
     }
 
     /// Handle space application messages.
+    #[tracing::instrument(skip_all, fields(space_id = ?self.id().renamed(), group_id = ?self.manager.id().renamed()))]
     async fn handle_application_message(
         &self,
         message: &M,
