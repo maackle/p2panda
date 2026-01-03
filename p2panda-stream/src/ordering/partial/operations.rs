@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use named_id::Rename;
 use p2panda_core::{Extensions, Hash, Operation};
 use p2panda_store::{LogStore, OperationStore};
 use thiserror::Error;
@@ -85,7 +86,7 @@ pub enum OperationDependencyCheckerError {
     #[error("store error: {0}")]
     StoreError(String),
 
-    #[error("processed operation not found in store: {0}")]
+    #[error("processed operation not found in store: {} ({})", _0.renamed(), _0)]
     MissingOperation(Hash),
 }
 
