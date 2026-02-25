@@ -1,6 +1,6 @@
 [package]
 name = "p2panda-spaces"
-version = "0.1.0"
+version = "0.5.1"
 edition = "2024"
 authors = [
   "adz <x12@adz.garden>",
@@ -24,11 +24,11 @@ polestar = ["p2panda-auth/polestar"]
 
 [dependencies]
 named-id = { git = "https://github.com/maackle/named-id.git" }
-p2panda-auth = { path = "../p2panda-auth", version = "0.4.0", features = [
+p2panda-auth = { path = "../p2panda-auth", version = "0.5.1", features = [
   "serde",
 ], default-features = false }
-p2panda-core = { path = "../p2panda-core", version = "0.4.0", default-features = false }
-p2panda-encryption = { path = "../p2panda-encryption", version = "0.4.0", features = [
+p2panda-core = { path = "../p2panda-core", version = "0.5.1", default-features = false }
+p2panda-encryption = { path = "../p2panda-encryption", version = "0.5.1", features = [
   "data_scheme",
 ], default-features = false }
 petgraph = "0.8.2"
@@ -40,10 +40,10 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
-p2panda-auth = { path = "../p2panda-auth", version = "0.4.0", features = [
+p2panda-auth = { path = "../p2panda-auth", version = "0.5.1", features = [
   "test_utils",
 ], default-features = false }
-p2panda-encryption = { path = "../p2panda-encryption", version = "0.4.0", features = [
+p2panda-encryption = { path = "../p2panda-encryption", version = "0.5.1", features = [
   "test_utils",
 ], default-features = false }
 tokio = { version = "1.46.1", features = ["rt", "macros"] }

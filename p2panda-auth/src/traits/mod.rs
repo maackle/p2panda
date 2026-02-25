@@ -8,12 +8,10 @@ use named_id::Rename;
 
 mod dgm;
 mod operation;
-mod orderer;
 mod resolver;
 
 pub use dgm::{GroupMembership, Groups};
 pub use operation::Operation;
-pub use orderer::Orderer;
 pub use resolver::Resolver;
 
 /// Handle to identify a group member.

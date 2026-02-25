@@ -50,8 +50,11 @@ pub type TestSpaceError = SpaceError<
 >;
 
 pub struct TestPeer {
-    pub(crate) _id: TestPeerId,
+    #[allow(unused)]
+    pub(crate) id: TestPeerId,
+    #[allow(unused)]
     pub(crate) manager: TestManager,
+    #[allow(unused)]
     pub(crate) credentials: Credentials,
 }
 
@@ -85,7 +88,7 @@ impl TestPeer {
         .unwrap();
 
         Self {
-            _id: peer_id,
+            id: peer_id,
             manager,
             credentials,
         }

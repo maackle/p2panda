@@ -31,6 +31,7 @@ impl Default for Config {
 #[cfg(any(test, feature = "test_utils"))]
 #[allow(unused)]
 impl Config {
+    #[allow(unused)]
     pub(crate) fn lifetime(&self) -> Lifetime {
         Lifetime::new(self.pre_key_lifetime.as_secs())
     }

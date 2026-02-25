@@ -32,11 +32,11 @@ p2panda is "broadcast-only" at it’s heart, making any data not only offline-fi
 
 ## Libraries
 
-📦 [`p2panda-net`](https://crates.io/crates/p2panda-net) - Find peers in a peer-to-peer network, connect to them directly - wherever they are - and exchange any data of your interest in form of byte streams.
+📦 [`p2panda-net`](https://crates.io/crates/p2panda-net) - Data-type-agnostic p2p networking, discovery, gossip and local-first sync.
 
-📦 [`p2panda-discovery`](https://crates.io/crates/p2panda-discovery) - Solutions to find other peers in your local network or on the internet and interfaces to start building your own.
+📦 [`p2panda-discovery`](https://crates.io/crates/p2panda-discovery) - Confidential topic and node discovery protocol.
 
-📦 [`p2panda-sync`](https://crates.io/crates/p2panda-sync) - Protocol implementations to efficiently "catch up on past state" with other peers and interfaces to start building your own.
+📦 [`p2panda-sync`](https://crates.io/crates/p2panda-sync) - Local-first sync for append-only logs and traits to build your own.
 
 📦 [`p2panda-blobs`](https://crates.io/crates/p2panda-blobs) - Efficiently send, receive and store (very large) files.
 

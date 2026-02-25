@@ -10,7 +10,6 @@ use p2panda_encryption::key_registry::{KeyRegistry, KeyRegistryState};
 use tokio::sync::RwLock;
 
 use crate::OperationId;
-use crate::auth::orderer::AuthOrderer;
 use crate::space::SpaceState;
 use crate::test_utils::{TestConditions, TestMessage, TestSpaceId};
 use crate::traits::{
@@ -42,9 +41,9 @@ impl<I, M, C> MemoryStore<I, M, C>
 where
     C: Conditions,
 {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        let orderer_y = AuthOrderer::init();
-        let auth_y = AuthGroupState::new(orderer_y);
+        let auth_y = AuthGroupState::new();
         let inner = MemoryStoreInner {
             auth: auth_y,
             spaces: HashMap::new(),
@@ -134,6 +133,12 @@ pub struct TestKeyStore {
 pub struct TestKeyStoreInner {
     prekey_secrets: PreKeyBundlesState,
     key_registry: KeyRegistryState<ActorId>,
+}
+
+impl Default for TestKeyStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestKeyStore {

@@ -2,7 +2,7 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-left.gif" width="auto" height="30px">
-  <strong>Data- and transport-agnostic sync protocols</strong>
+  <strong>Local-first sync for append-only logs and traits to build your own</strong>
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-right.gif" width="auto" height="30px">
 </div>
 
@@ -22,20 +22,19 @@
   </h3>
 </div>
 
-This crate provides a data- and transport-agnostic interface to implement custom sync protocols,
-compatible with `p2panda-net` or other peer-to-peer networking solutions.
+Data-type agnostic interfaces for implementing sync protocols and managers which can be used
+stand-alone or as part of the local-first stack provided by `p2panda-net`.
 
-In addition to the generic definition of the `SyncProtocol` trait, `p2panda-sync` includes
-optional implementations for efficient sync of append-only log-based data types. These optional
-implementations may be activated via feature flags. Finally, `p2panda-sync` provides helpers to
-encode wire messages in CBOR.
+Users can implement two-party sync protocols over a `Sink` / `Stream` pair with the `Protocol`
+trait and a system for instantiating and orchestrating concurrent sync sessions with the `Manager`
+trait. 
 
-## Features
+Concrete implementations for performing sync over p2panda append-only logs associated with a
+generic topic can be found in the `manager` and `protocols` modules.
 
-- Transport- and data-type agnostic trait definitions compatible with `p2panda-net`
-- Efficient and ready-to-use implementation for log-height based sync of p2panda core data-types
-- Privacy-first design allowing implementations to reveal as little information as possible during handshake phase
-- Generic design to re-use the same sync protocol for very different applications
+For most high-level users `p2panda-net` will be the entry point into local-first development with
+p2panda. Interfaces in this crate are intended for cases where users want to integrate their own
+base convergent data-type and sync protocols as a module in the `p2panda-net` stack.
 
 ## License
 
@@ -47,10 +46,11 @@ additional terms or conditions.
 
 [Apache License, Version 2.0]: https://github.com/p2panda/p2panda/blob/main/LICENSES/Apache-2.0.txt
 [MIT license]: https://github.com/p2panda/p2panda/blob/main/LICENSES/MIT.txt
+[p2panda-net]: https://docs.rs/p2panda-net/latest/p2panda_net/
 
 ---
 
-*This project has received funding from the European Union’s Horizon 2020
+_This project has received funding from the European Union’s Horizon 2020
 research and innovation programme within the framework of the NGI-POINTER
 Project funded under grant agreement No 871528, NGI-ASSURE No 957073 and
-NGI0-ENTRUST No 101069594*.
+NGI0-ENTRUST No 101069594_.

@@ -2,10 +2,12 @@
 
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::str::FromStr;
 
 use named_id::RenameAll;
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::traits::Conditions;
 
@@ -150,6 +152,28 @@ impl<C: PartialOrd + Eq> Ord for Access<C> {
 }
 
 impl Conditions for () {}
+
+#[derive(Debug, Error)]
+pub enum AccessError {
+    #[error("unknown access string: {0}")]
+    Unknown(String),
+}
+
+impl FromStr for Access {
+    type Err = AccessError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let access = match s {
+            "pull" => Access::pull(),
+            "read" => Access::read(),
+            "write" => Access::write(),
+            "manage" => Access::manage(),
+            _ => return Err(AccessError::Unknown(s.to_string())),
+        };
+
+        Ok(access)
+    }
+}
 
 #[cfg(test)]
 mod tests {
