@@ -9,7 +9,7 @@ use crate::group::GroupAction;
 use crate::traits::{Conditions, Operation as AuthOperation};
 
 /// Auth extensions.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AuthExtension<C = ()> {
     pub group_id: PublicKey,
     pub action: GroupAction<PublicKey, C>,
