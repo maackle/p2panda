@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// All state material required for ordering and processing group messages.
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct AuthState<M, C = ()>
 where
     M: Operation<PublicKey, Hash, C>,

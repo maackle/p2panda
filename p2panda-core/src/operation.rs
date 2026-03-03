@@ -104,7 +104,7 @@ use crate::{Extension, Extensions};
 pub type RawOperation = (Vec<u8>, Option<Vec<u8>>);
 
 /// Combined [`Header`], [`Body`] and operation [`struct@Hash`] (Operation Id).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Operation<E = ()> {
     pub hash: Hash,
     pub header: Header<E>,

@@ -45,14 +45,14 @@ where
 }
 
 /// Memory implementation of the `PartialOrderStore` trait.
-#[derive(Clone)]
-pub struct MemoryStore<K> {
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct MemoryStore<K: Clone + Copy + Debug + StdHash + PartialEq + Eq> {
     pub(crate) ready: HashSet<K>,
     pub(crate) ready_queue: VecDeque<K>,
     pub(crate) pending: HashMap<K, HashSet<(K, Vec<K>)>>,
 }
 
-impl<K> Default for MemoryStore<K> {
+impl<K: Clone + Copy + Debug + StdHash + PartialEq + Eq> Default for MemoryStore<K> {
     fn default() -> Self {
         Self {
             ready: HashSet::new(),
