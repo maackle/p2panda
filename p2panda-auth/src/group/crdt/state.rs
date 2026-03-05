@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use named_id::{Rename, RenameAll};
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -22,8 +23,8 @@ use crate::traits::Conditions;
 
 /// Invalid group state modification attempts due to group membership state and member access
 /// levels.
-#[derive(Debug, Error, PartialEq)]
-pub enum GroupMembershipError<ID> {
+#[derive(Debug, Error, PartialEq, RenameAll)]
+pub enum GroupMembershipError<ID: Rename> {
     #[error("attempted to add a member who is already active in the group: {0}")]
     AlreadyAdded(ID),
 
@@ -162,7 +163,7 @@ where
 }
 
 /// Create a new group and add the given set of initial members.
-pub fn create<ID: Clone + Eq + Hash, C: Conditions>(
+pub fn create<ID: Clone + Eq + Hash + Rename, C: Conditions>(
     initial_members: &[(ID, Access<C>)],
 ) -> GroupMembersState<ID, C> {
     let mut members = HashMap::new();
@@ -185,7 +186,7 @@ pub fn create<ID: Clone + Eq + Hash, C: Conditions>(
 /// error.
 ///
 /// Re-adding a previously removed member is supported.
-pub fn add<ID: Clone + Eq + Hash, C: Conditions>(
+pub fn add<ID: Clone + Eq + Hash + Rename, C: Conditions>(
     state: GroupMembersState<ID, C>,
     adder: ID,
     added: ID,
@@ -193,6 +194,10 @@ pub fn add<ID: Clone + Eq + Hash, C: Conditions>(
 ) -> Result<GroupMembersState<ID, C>, GroupMembershipError<ID>> {
     // Ensure that "adder" is known to the group.
     let Some(adder_state) = state.members.get(&adder) else {
+        println!("=== DUMP OF STATE ===");
+        for id in state.members.keys() {
+            println!("ID: {:?}", id.clone().renamed());
+        }
         return Err(GroupMembershipError::UnrecognisedActor(adder));
     };
 
@@ -237,7 +242,7 @@ pub fn add<ID: Clone + Eq + Hash, C: Conditions>(
 /// The `remover` must be an active member of the group with `Manage` access and the `removed`
 /// identity must also be an active member of the group; failure to meet these conditions will
 /// result in an error.
-pub fn remove<ID: Eq + Hash, C: Conditions>(
+pub fn remove<ID: Eq + Hash + Rename, C: Conditions>(
     state: GroupMembersState<ID, C>,
     remover: ID,
     removed: ID,
@@ -284,7 +289,7 @@ pub fn remove<ID: Eq + Hash, C: Conditions>(
 /// conditions will result in an error.
 ///
 /// This is a helper method to reduce code duplication in `promote()` and `demote()`.
-fn modify<ID: Eq + Hash, C: Conditions>(
+fn modify<ID: Eq + Hash + Rename, C: Conditions>(
     state: GroupMembersState<ID, C>,
     modifier: ID,
     modified: ID,
@@ -332,7 +337,7 @@ fn modify<ID: Eq + Hash, C: Conditions>(
 /// The `promoter` must be an active member of the group with `Manage` access and the `promoted`
 /// identity must also be an active member of the group; failure to meet these conditions will
 /// result in an error.
-pub fn promote<ID: Eq + Hash, C: Conditions>(
+pub fn promote<ID: Eq + Hash + Rename, C: Conditions>(
     state: GroupMembersState<ID, C>,
     promoter: ID,
     promoted: ID,
@@ -360,7 +365,7 @@ pub fn promote<ID: Eq + Hash, C: Conditions>(
 /// The `demoter` must be an active member of the group with `Manage` access and the `demoted`
 /// identity must also be an active member of the group; failure to meet these conditions will
 /// result in an error.
-pub fn demote<ID: Eq + Hash, C: Conditions>(
+pub fn demote<ID: Eq + Hash + Rename, C: Conditions>(
     state: GroupMembersState<ID, C>,
     demoter: ID,
     demoted: ID,
@@ -389,7 +394,7 @@ pub fn demote<ID: Eq + Hash, C: Conditions>(
 ///
 /// If a member exists with different access levels in each state but the same number of access
 /// modifications, the lower of the two access levels will be chosen.
-pub fn merge<ID: Clone + Eq + Hash, C: Conditions>(
+pub fn merge<ID: Clone + Eq + Hash + Rename, C: Conditions>(
     state_1: GroupMembersState<ID, C>,
     state_2: GroupMembersState<ID, C>,
 ) -> GroupMembersState<ID, C> {

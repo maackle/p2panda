@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use named_id::RenameAll;
 use petgraph::prelude::DiGraphMap;
 use petgraph::visit::{DfsPostOrder, IntoNodeIdentifiers, NodeIndexable, Reversed};
 #[cfg(any(test, feature = "serde"))]
@@ -16,8 +17,6 @@ use crate::access::Access;
 use crate::group::{GroupAction, GroupMember, GroupMembersState, GroupMembershipError};
 use crate::traits::{Conditions, IdentityHandle, Operation, OperationId, Resolver};
 
-use crate::polestar::AuthEvent;
-
 /// Max depth of group nesting allowed.
 ///
 /// Depth is checked during group state queries and if the depth is exceeded further additions are
@@ -26,14 +25,14 @@ use crate::polestar::AuthEvent;
 const MAX_NESTED_DEPTH: u32 = 1000;
 
 /// Inner error types for GroupCrdt.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, RenameAll)]
 pub enum GroupCrdtInnerError<OP> {
     #[error("states {0:?} not found")]
     StatesNotFound(Vec<OP>),
 }
 
 /// Error types for GroupCrdt.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, RenameAll)]
 pub enum GroupCrdtError<ID, OP, M, C, RS>
 where
     ID: IdentityHandle,
@@ -56,6 +55,7 @@ where
     ManagerGroupsNotAllowed(ID),
 
     #[error("resolver error: {0}")]
+    #[named_id(skip)]
     Resolver(RS::Error),
 }
 

@@ -5,6 +5,7 @@ mod extensions;
 mod store;
 
 pub use extensions::AuthExtension;
+use named_id::RenameAll;
 pub use store::{AuthState, Store, StoreError};
 
 use std::fmt::Debug;
@@ -56,7 +57,7 @@ where
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Error)]
+#[derive(Debug, Error, RenameAll)]
 pub enum ProcessorError<M, C, RS>
 where
     M: Operation<PublicKey, Hash, C> + Clone + Debug,

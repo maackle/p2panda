@@ -93,6 +93,7 @@
 //! let prune_flag: PruneFlag = header.extension().unwrap();
 //! assert!(prune_flag.is_set())
 //! ```
+use named_id::RenameNone;
 use thiserror::Error;
 
 use crate::cbor::{DecodeError, decode_cbor, encode_cbor};
@@ -104,7 +105,7 @@ use crate::{Extension, Extensions};
 pub type RawOperation = (Vec<u8>, Option<Vec<u8>>);
 
 /// Combined [`Header`], [`Body`] and operation [`struct@Hash`] (Operation Id).
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, RenameNone)]
 pub struct Operation<E = ()> {
     pub hash: Hash,
     pub header: Header<E>,

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Strong remove group resolver implementation.
+use named_id::RenameNone;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{IntoNodeIdentifiers, Topo};
 use std::collections::{HashMap, HashSet};
@@ -10,8 +11,6 @@ use crate::graph::{concurrent_bubbles, split_bubble};
 use crate::group::crdt::{GroupCrdtInnerError, apply_remove_unsafe};
 use crate::group::{AuthorityGraphs, GroupAction, GroupCrdtInnerState, GroupMember, apply_action};
 use crate::traits::{Conditions, IdentityHandle, Operation, OperationId, Resolver};
-
-use crate::polestar::AuthEvent;
 
 /// An implementation of `Resolver` trait which follows strong remove ruleset.  
 ///
@@ -47,7 +46,7 @@ use crate::polestar::AuthEvent;
 ///
 /// When an operation is "explicitly" filtered it may cause dependent operations to become
 /// invalid, these operations should not be applied to the group state.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, RenameNone)]
 pub struct StrongRemove<ID, OP, M, C> {
     _phantom: PhantomData<(ID, OP, M, C)>,
 }

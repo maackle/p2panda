@@ -2,6 +2,7 @@
 
 //! Extensions for p2panda operations required when they are the underlying messaging carrier for
 //! auth groups messages.
+use named_id::RenameAll;
 use p2panda_core::{Extension, Extensions, Hash, Operation, PublicKey};
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +10,7 @@ use crate::group::GroupAction;
 use crate::traits::{Conditions, Operation as AuthOperation};
 
 /// Auth extensions.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, RenameAll)]
 pub struct AuthExtension<C = ()> {
     pub group_id: PublicKey,
     pub action: GroupAction<PublicKey, C>,

@@ -183,11 +183,13 @@ impl fmt::Display for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("PublicKey").field(self.0.as_bytes()).finish()
+        // This helps with named-id compatibility across containing types
+        write!(f, "{}", self.to_hex())
+        // f.debug_tuple("PublicKey").field(self.0.as_bytes()).finish()
     }
 }
 
-impl Nameable for crate::PublicKey {
+impl Nameable for PublicKey {
     fn shortener(&self) -> Option<Shortener> {
         Some(Shortener {
             prefix: "PK",

@@ -7,12 +7,13 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash as StdHash;
 use std::marker::PhantomData;
 
+use named_id::RenameNone;
 use thiserror::Error;
 
 pub use crate::partial::store::{MemoryStore, PartialOrderStore};
 
 /// Error types which may be returned from `PartialOrder` methods.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, RenameNone)]
 pub enum PartialOrderError {
     #[error("store error: {0}")]
     StoreError(String),

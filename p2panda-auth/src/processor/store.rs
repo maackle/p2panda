@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{fmt::Debug, ops::Deref};
 
+use named_id::RenameNone;
 use p2panda_core::{Hash, PublicKey};
 use p2panda_stream::partial::MemoryStore;
 use thiserror::Error;
@@ -82,7 +83,7 @@ where
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, RenameNone)]
 pub enum StoreError {
     #[error("auth state missing")]
     StateMissing,
