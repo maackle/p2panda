@@ -13,7 +13,7 @@ use crate::traits::Conditions;
 
 /// The four basic access levels which can be assigned to an actor. Greater access levels are
 /// assumed to also contain all lower ones.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, RenameAll)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, RenameAll)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum AccessLevel {
     /// Permission to sync a data set.
@@ -38,7 +38,7 @@ pub enum AccessLevel {
 /// For example, a condition to model access boundaries using paths could be introduced where
 /// having access to "/public" gives you access to "/public/stuff" and "/public/other/stuff" but
 /// not "/private" or "/private/stuff".
-#[derive(Clone, Debug, PartialEq, Eq, RenameAll)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, RenameAll)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub struct Access<C = ()> {
     pub conditions: Option<C>,
