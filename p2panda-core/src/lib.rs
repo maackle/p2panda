@@ -32,8 +32,6 @@
 //! different authors and/or processes. Operations contain information which can be used for
 //! establishing order depending on one's use case:
 //! - `timestamp`: UNIX timestamp describing when the operation was created.
-//! - `previous`: List of hashes referring to the previously observed operations to establish
-//!   cryptographically secure partial-ordering.
 //!
 //! Custom extension fields can be defined by users of this library to introduce additional
 //! functionality depending on their particular use cases. p2panda provides our own extensions
@@ -51,7 +49,7 @@
 //! ## Example
 //!
 //! ```
-//! use p2panda_core::{Body, Header, Operation, PrivateKey};
+//! use p2panda_core::{Body, Header, Operation, PrivateKey, Timestamp};
 //!
 //! // Every operation is cryptographically authenticated by an author by signing it with an
 //! // Ed25519 key pair. This method generates a new private key for us which needs to be securely
@@ -67,10 +65,9 @@
 //!     signature: None,
 //!     payload_size: body.size(),
 //!     payload_hash: Some(body.hash()),
-//!     timestamp: 1733170247,
+//!     timestamp: Timestamp::now(),
 //!     seq_num: 0,
 //!     backlink: None,
-//!     previous: vec![],
 //!     extensions: (),
 //! };
 //!
@@ -82,17 +79,26 @@ pub mod cbor;
 pub mod extensions;
 pub mod hash;
 pub mod identity;
+pub mod logs;
 pub mod operation;
 #[cfg(feature = "prune")]
 pub mod prune;
 mod serde;
+#[cfg(any(test, feature = "test_utils"))]
+pub mod test_utils;
+pub mod timestamp;
+pub mod topic;
+pub mod traits;
 
 pub use extensions::{Extension, Extensions};
 pub use hash::{Hash, HashError};
 pub use identity::{IdentityError, PrivateKey, PublicKey, Signature};
+pub use logs::{LogId, SeqNum};
 pub use operation::{
     Body, Header, Operation, OperationError, RawOperation, validate_backlink, validate_header,
     validate_operation,
 };
 #[cfg(feature = "prune")]
 pub use prune::PruneFlag;
+pub use timestamp::Timestamp;
+pub use topic::Topic;

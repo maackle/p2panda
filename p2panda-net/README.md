@@ -2,7 +2,7 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-left.gif" width="auto" height="30px">
-  <strong>Data-type-agnostic p2p networking</strong>
+  <strong>Data-type-agnostic p2p networking, discovery, gossip and local-first sync</strong>
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-right.gif" width="auto" height="30px">
 </div>
 
@@ -22,93 +22,89 @@
   </h3>
 </div>
 
-This crate provides a data-type-agnostic p2p networking layer offering robust, direct communication
-to any device, no matter where they are.
+`p2panda-net` is a collection of Rust modules providing solutions for a whole
+set of peer-to-peer and [local-first] application requirements. Collectively
+these modules solve the problem of event delivery.
 
-It provides a stream-based API for higher layers: Applications subscribe to any "topic" they are
-interested in and `p2panda-net` will automatically discover similar peers and transport raw bytes
-between them.
-
-Additionally `p2panda-net` can be extended with custom sync protocols for all data types, allowing
-applications to "catch up on past data", eventually converging to the same state.
-
-Most of the lower-level networking of `p2panda-net` is made possible by the work of
-[iroh](https://github.com/n0-computer/iroh/) utilising well-established and known standards, like
-QUIC for transport, (self-certified) TLS for transport encryption, STUN for establishing direct
-connections between devices, Tailscale's DERP (Designated Encrypted Relay for Packets) for relay
-fallbacks, PlumTree and HyParView for broadcast-based gossip overlays.
+Applications subscribe to any topic they are interested in and `p2panda-net`
+will automatically discover similar peers and exchange messages between them.
 
 ## Features
 
-- Data of any kind can be exchanged efficiently via gossip broadcast ("live mode") or via sync
-  protocols between two peers ("catching up on past state")
-- Custom network-wide queries to express interest in certain data of applications
-- Ambient peer discovery: Learning about new, previously unknown peers in the network
-- Ambient topic discovery: Learning what peers are interested in, automatically forming
-  overlay networks per topic
-- Sync protocol API, providing an eventual-consistency guarantee that peers will converge on
-  the same state over time
-- Manages connections, automatically syncs with discovered peers and re-tries on faults
-- Extension to handle efficient sync of large files
+- [Publish & Subscribe] for ephemeral messages (gossip protocol)
+- Publish & Subscribe for messages with [Eventual Consistency] guarantee (sync
+  protocol)
+- Confidentially discover nodes who are interested in the same topic ([Private
+  Set Intersection])
+- Establish and manage direct connections to any device over the Internet
+  (using [iroh])
+- Monitor system with supervisors and restart modules on critical failure
+  (Erlang-inspired [Supervision Trees])
+- Modular API allowing users to choose or replace the layers they want to use
 
-## Example
+## Getting Started
+
+Install the Rust crate using `cargo add p2panda-net`.
 
 ```rust
-use anyhow::Result;
-use p2panda_core::{PrivateKey, Hash};
-use p2panda_discovery::mdns::LocalDiscovery;
-use p2panda_net::{NetworkBuilder, TopicId};
-use p2panda_sync::TopicQuery;
-use serde::{Serialize, Deserialize};
+use futures_util::StreamExt;
+use p2panda_core::Hash;
+use p2panda_net::iroh_mdns::MdnsDiscoveryMode;
+use p2panda_net::{AddressBook, Discovery, Endpoint, MdnsDiscovery, Gossip};
 
-// The network can be used to automatically find and ask other peers about any data the
-// application is interested in. This is expressed through "network-wide queries" over topics.
-//
-// In this example we would like to be able to query messages from each chat group, identified
-// by a BLAKE3 hash.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct ChatGroup(Hash);
+// Topics are used to discover other nodes and establish connections around them.
+let topic = Hash::new(b"shirokuma-cafe").into();
 
-impl ChatGroup {
-    pub fn new(name: &str) -> Self {
-        Self(Hash::new(name.as_bytes()))
+// Maintain an address book of newly discovered or manually added nodes.
+let address_book = AddressBook::builder().spawn().await?;
+
+// Establish direct connections to any device with the help of iroh.
+let endpoint = Endpoint::builder(address_book.clone())
+    .spawn()
+    .await?;
+
+// Discover nodes on your local-area network.
+let mdns = MdnsDiscovery::builder(address_book.clone(), endpoint.clone())
+    .mode(MdnsDiscoveryMode::Active)
+    .spawn()
+    .await?;
+
+// Confidentially discover nodes interested in the same topic.
+let discovery = Discovery::builder(address_book.clone(), endpoint.clone())
+    .spawn()
+    .await?;
+
+// Disseminate messages among nodes.
+let gossip = Gossip::builder(address_book.clone(), endpoint.clone())
+    .spawn()
+    .await?;
+
+// Join topic to publish and subscribe to stream of (ephemeral) messages.
+let cafe = gossip.stream(topic).await?;
+
+// This message will be seen by other nodes if they're online. If you want messages to arrive
+// eventually, even when they've been offline, you need to use p2panda's "sync" module.
+cafe.publish(b"Hello, Panda!").await?;
+
+let mut rx = cafe.subscribe();
+tokio::spawn(async move {
+    while let Some(Ok(bytes)) = rx.next().await {
+        println!("{}", String::from_utf8(bytes).expect("valid UTF-8 string"));
     }
-}
-
-impl TopicQuery for ChatGroup {}
-
-impl TopicId for ChatGroup {
-    fn id(&self) -> [u8; 32] {
-        self.0.into()
-    }
-}
-
-async fn run() -> Result<()> {
-    // Peers using the same "network id" will eventually find each other. This
-    // is the most global identifier to group peers into multiple networks when
-    // necessary.
-    let network_id = [1; 32];
-
-    // Generate an Ed25519 private key which will be used to authenticate your peer towards others.
-    let private_key = PrivateKey::new();
-
-    // Use mDNS to discover other peers on the local network.
-    let mdns_discovery = LocalDiscovery::new();
-
-    // Establish the p2p network which will automatically connect you to any discovered peers.
-    let network = NetworkBuilder::new(network_id.into())
-        .private_key(private_key)
-        .discovery(mdns_discovery)
-        .build()
-        .await?;
-
-    // From now on we can send and receive bytes to any peer interested in the same chat.
-    let my_friends_group = ChatGroup::new("me-and-my-friends");
-    let (tx, mut rx, ready) = network.subscribe(my_friends_group).await?;
-
-    Ok(())
-}
+});
 ```
+
+For a complete command-line application using `p2panda-net` with a sync
+protocol, see our [`chat.rs`] example.
+
+[local-first]: https://www.inkandswitch.com/local-first-software/
+[Publish & Subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
+[Eventual Consistency]: https://en.wikipedia.org/wiki/Eventual_consistency
+[Actor Model]: https://en.wikipedia.org/wiki/Actor_model
+[Private Set Intersection]: https://en.wikipedia.org/wiki/Private_set_intersection
+[Supervision Trees]: https://adoptingerlang.org/docs/development/supervision_trees/
+[iroh]: https://www.iroh.computer/
+[`chat.rs`]: https://github.com/p2panda/p2panda/blob/main/p2panda-net/examples/chat.rs
 
 ## License
 
@@ -123,7 +119,7 @@ additional terms or conditions.
 
 ---
 
-*This project has received funding from the European Union’s Horizon 2020
+_This project has received funding from the European Union’s Horizon 2020
 research and innovation programme within the framework of the NGI-POINTER
 Project funded under grant agreement No 871528, NGI-ASSURE No 957073 and
-NGI0-ENTRUST No 101069594*.
+NGI0-ENTRUST No 101069594_.

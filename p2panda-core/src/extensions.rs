@@ -25,7 +25,7 @@
 //! //! ## Example
 //!
 //! ```
-//! use p2panda_core::{Body, Hash, Extension, Header, PrivateKey};
+//! use p2panda_core::{Body, Hash, Extension, Header, PrivateKey, Timestamp};
 //! use serde::{Serialize, Deserialize};
 //!
 //! #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -70,10 +70,9 @@
 //!     signature: None,
 //!     payload_size: body.size(),
 //!     payload_hash: Some(body.hash()),
-//!     timestamp: 0,
+//!     timestamp: Timestamp::now(),
 //!     seq_num: 0,
 //!     backlink: None,
-//!     previous: vec![],
 //!     extensions: extensions.clone(),
 //! };
 //!

@@ -42,6 +42,7 @@ impl<I, M, C> MemoryStore<I, M, C>
 where
     C: Conditions,
 {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let orderer_y = AuthOrderer::init();
         let auth_y = AuthGroupState::new(orderer_y);
@@ -134,6 +135,12 @@ pub struct TestKeyStore {
 pub struct TestKeyStoreInner {
     prekey_secrets: PreKeyBundlesState,
     key_registry: KeyRegistryState<ActorId>,
+}
+
+impl Default for TestKeyStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestKeyStore {

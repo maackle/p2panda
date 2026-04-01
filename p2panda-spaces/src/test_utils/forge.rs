@@ -28,7 +28,7 @@ where
             store,
             inner: Arc::new(RwLock::new(TestForgeInner {
                 next_seq_num: 0,
-                _private_key: private_key,
+                private_key,
             })),
         }
     }
@@ -36,8 +36,10 @@ where
 
 #[derive(Debug)]
 pub struct TestForgeInner {
+    #[allow(unused)]
     next_seq_num: SeqNum,
-    _private_key: PrivateKey,
+    #[allow(unused)]
+    private_key: PrivateKey,
 }
 
 impl<S> Forge<TestSpaceId, TestMessage, TestConditions> for TestForge<S>
@@ -63,7 +65,7 @@ where
 
         let message = TestMessage {
             seq_num,
-            public_key: self.public_key.clone(),
+            public_key: self.public_key,
             spaces_args: args,
         };
 

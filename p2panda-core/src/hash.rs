@@ -23,6 +23,8 @@ use arbitrary::Arbitrary;
 use named_id::{Nameable, Shortener};
 use thiserror::Error;
 
+use crate::traits::OperationId;
+
 /// The length of a BLAKE3 hash in bytes.
 pub const HASH_LEN: usize = blake3::KEY_LEN;
 
@@ -116,6 +118,7 @@ impl FromStr for Hash {
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Hash {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.as_bytes().cmp(other.0.as_bytes()))
@@ -156,6 +159,8 @@ impl Nameable for Hash {
         })
     }
 }
+
+impl OperationId for Hash {}
 
 /// Error types for `Hash` struct.
 #[derive(Error, Debug)]

@@ -8,9 +8,12 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use serde_bytes::{ByteBuf as SerdeByteBuf, Bytes as SerdeBytes};
 
+use crate::Topic;
 use crate::hash::{Hash, HashError};
 use crate::identity::{IdentityError, PrivateKey, PublicKey, Signature};
 use crate::operation::{Body, Header};
+use crate::timestamp::Timestamp;
+use crate::topic::TopicError;
 
 /// Helper method for `serde` to serialize bytes into a hex string when using a human readable
 /// encoding (JSON, GraphQL), otherwise it serializes the bytes directly (CBOR).
@@ -159,8 +162,6 @@ where
             seq.serialize_element(backlink)?;
         }
 
-        seq.serialize_element(&self.previous)?;
-
         // @TODO: there is an opportunity to skip serializing if `E` is a zero-sized type,
         // and save one byte.
         seq.serialize_element(&self.extensions)?;
@@ -221,7 +222,7 @@ where
                     }
                 };
 
-                let timestamp: u64 = seq
+                let timestamp: Timestamp = seq
                     .next_element()?
                     .ok_or(SerdeError::custom("timestamp missing"))?;
 
@@ -239,10 +240,6 @@ where
                     }
                 };
 
-                let previous: Vec<Hash> = seq
-                    .next_element()?
-                    .ok_or(SerdeError::custom("previous array missing"))?;
-
                 // @TODO: If `E` is a zero-sized type, use `mem::conjure_zst` when ready.
                 // See https://github.com/rust-lang/rust/pull/146479
                 let extensions: E = seq
@@ -258,7 +255,6 @@ where
                     timestamp,
                     seq_num,
                     backlink,
-                    previous,
                     extensions,
                 })
             }
@@ -286,6 +282,29 @@ impl<'de> Deserialize<'de> for Body {
     {
         let bytes = deserialize_hex(deserializer)?;
         Ok(Body(bytes.to_vec()))
+    }
+}
+
+impl Serialize for Topic {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serialize_hex(&self.0, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Topic {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes = deserialize_hex(deserializer)?;
+
+        bytes
+            .as_slice()
+            .try_into()
+            .map_err(|err: TopicError| serde::de::Error::custom(err.to_string()))
     }
 }
 
@@ -421,10 +440,9 @@ mod tests {
                 public_key: private_key.public_key(),
                 payload_size: 123,
                 payload_hash: Some(Hash::new(vec![1, 2, 3])),
-                timestamp: 0,
+                timestamp: 0.into(),
                 seq_num: 0,
                 backlink: None,
-                previous: vec![],
                 extensions: extensions.clone(),
                 signature: None,
             },
@@ -437,10 +455,9 @@ mod tests {
                 public_key: private_key.public_key(),
                 payload_size: 0,
                 payload_hash: None,
-                timestamp: 0,
+                timestamp: 0.into(),
                 seq_num: 0,
                 backlink: None,
-                previous: vec![],
                 extensions: extensions,
                 signature: None,
             },
@@ -459,10 +476,9 @@ mod tests {
             signature: None,
             payload_size: 2829099,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);
@@ -477,10 +493,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: Some(Hash::new([0, 1, 2])),
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);
@@ -495,10 +510,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: Some(Hash::new([0, 1, 2])),
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);
@@ -513,10 +527,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 10,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);
@@ -542,10 +555,9 @@ mod tests {
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);
@@ -566,153 +578,88 @@ mod tests {
             125, 4, 50, 218, 157, 230, 174, 1, 154, 231, 231, 142, 22, 170,
         ]);
 
-        // header at seq num 0 with no previous
+        // header at seq num 0
         let mut header_0 = Header::<()> {
             version: 1,
             public_key: private_key.public_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header_0.sign(&private_key);
 
         let bytes = [
             136, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 177,
-            60, 248, 186, 240, 172, 58, 52, 236, 91, 174, 35, 231, 179, 180, 2, 105, 53, 7, 78, 71,
-            179, 99, 159, 171, 47, 250, 15, 242, 228, 75, 39, 112, 204, 138, 63, 88, 171, 227, 239,
-            194, 88, 171, 32, 138, 26, 93, 203, 190, 178, 85, 186, 245, 227, 45, 65, 169, 195, 90,
-            212, 39, 49, 28, 0, 0, 0, 0, 128, 246,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 162,
+            119, 197, 116, 19, 137, 242, 179, 181, 27, 136, 2, 67, 77, 82, 72, 156, 204, 44, 201,
+            79, 86, 4, 213, 185, 131, 200, 124, 72, 221, 193, 208, 79, 113, 54, 72, 105, 221, 154,
+            214, 70, 101, 243, 141, 29, 200, 81, 253, 44, 29, 183, 180, 237, 217, 250, 247, 232,
+            77, 133, 174, 124, 113, 179, 0, 0, 0, 0, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
         assert_eq!(header_0, header_again);
 
-        // header at seq num 0 with previous
-        let mut header_0_with_previous = Header::<()> {
-            version: 1,
-            public_key: private_key.public_key(),
-            signature: None,
-            payload_size: 0,
-            payload_hash: None,
-            timestamp: 0,
-            seq_num: 0,
-            backlink: None,
-            previous: vec![header_0.hash()],
-            extensions: (),
-        };
-        header_0_with_previous.sign(&private_key);
-
-        let bytes = [
-            136, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 86,
-            187, 206, 107, 141, 200, 7, 157, 107, 47, 49, 47, 4, 177, 76, 141, 51, 230, 245, 151,
-            124, 185, 157, 79, 59, 59, 14, 91, 105, 6, 229, 145, 62, 167, 203, 221, 253, 28, 128,
-            113, 59, 30, 148, 3, 153, 7, 16, 55, 52, 195, 216, 9, 97, 167, 205, 26, 141, 82, 229,
-            39, 124, 198, 186, 9, 0, 0, 0, 129, 88, 32, 201, 88, 182, 128, 125, 179, 108, 4, 23,
-            151, 168, 52, 216, 181, 123, 95, 11, 78, 75, 6, 236, 167, 141, 219, 243, 115, 255, 203,
-            100, 128, 30, 92, 246,
-        ];
-
-        let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
-        assert_eq!(header_0_with_previous, header_again);
-
-        // header at seq num 0 with previous and body
+        // header at seq num 0 with body
         let body = Body::new("Hello, Sloth!".as_bytes());
-        let mut header_0_with_previous_and_body = Header::<()> {
+        let mut header_0_with_body = Header::<()> {
             version: 1,
             public_key: private_key.public_key(),
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![header_0.hash()],
             extensions: (),
         };
-        header_0_with_previous_and_body.sign(&private_key);
+        header_0_with_body.sign(&private_key);
 
         let bytes = [
             137, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 152,
-            61, 237, 59, 97, 221, 165, 207, 164, 49, 55, 177, 168, 40, 36, 190, 47, 59, 86, 231,
-            231, 117, 182, 186, 45, 142, 7, 98, 17, 1, 153, 173, 165, 127, 208, 222, 173, 157, 81,
-            165, 228, 184, 230, 165, 88, 173, 41, 104, 171, 12, 18, 57, 179, 18, 254, 50, 65, 226,
-            147, 228, 201, 28, 123, 7, 13, 88, 32, 191, 127, 68, 13, 227, 43, 252, 155, 49, 148,
-            176, 2, 162, 217, 175, 171, 49, 44, 181, 215, 71, 113, 211, 195, 29, 128, 192, 169, 5,
-            138, 160, 142, 0, 0, 129, 88, 32, 201, 88, 182, 128, 125, 179, 108, 4, 23, 151, 168,
-            52, 216, 181, 123, 95, 11, 78, 75, 6, 236, 167, 141, 219, 243, 115, 255, 203, 100, 128,
-            30, 92, 246,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 136,
+            51, 130, 185, 39, 243, 140, 206, 152, 146, 1, 227, 78, 244, 169, 189, 254, 93, 235,
+            141, 83, 18, 171, 96, 211, 31, 55, 236, 234, 186, 100, 232, 21, 185, 100, 104, 123,
+            215, 21, 32, 151, 104, 96, 50, 100, 158, 210, 24, 111, 4, 170, 114, 175, 175, 114, 236,
+            12, 145, 122, 49, 80, 223, 234, 0, 13, 88, 32, 191, 127, 68, 13, 227, 43, 252, 155, 49,
+            148, 176, 2, 162, 217, 175, 171, 49, 44, 181, 215, 71, 113, 211, 195, 29, 128, 192,
+            169, 5, 138, 160, 142, 0, 0, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
-        assert_eq!(header_0_with_previous_and_body, header_again);
+        assert_eq!(header_0_with_body, header_again);
 
-        // header at seq num 1 with backlink but no previous
+        // header at seq num 1 with backlink
         let mut header_1 = Header::<()> {
             version: 1,
             public_key: private_key.public_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 1,
             backlink: Some(header_0.hash()),
-            previous: vec![],
             extensions: (),
         };
         header_1.sign(&private_key);
 
         let bytes = [
             137, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 159,
-            29, 188, 12, 62, 68, 90, 135, 233, 157, 134, 251, 205, 180, 206, 144, 230, 240, 161,
-            42, 236, 217, 77, 210, 161, 229, 92, 67, 213, 170, 105, 53, 16, 57, 43, 62, 143, 162,
-            177, 91, 154, 154, 131, 45, 138, 152, 49, 80, 42, 144, 249, 30, 166, 143, 139, 255, 54,
-            65, 180, 15, 102, 222, 210, 6, 0, 0, 1, 88, 32, 201, 88, 182, 128, 125, 179, 108, 4,
-            23, 151, 168, 52, 216, 181, 123, 95, 11, 78, 75, 6, 236, 167, 141, 219, 243, 115, 255,
-            203, 100, 128, 30, 92, 128, 246,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 163,
+            146, 208, 221, 247, 216, 191, 71, 252, 113, 232, 54, 108, 158, 15, 120, 152, 147, 198,
+            116, 165, 70, 159, 174, 48, 58, 107, 241, 0, 23, 87, 126, 246, 84, 165, 116, 131, 99,
+            252, 142, 92, 193, 76, 77, 96, 60, 82, 227, 146, 76, 92, 161, 84, 243, 135, 42, 138,
+            135, 226, 176, 46, 150, 141, 14, 0, 0, 1, 88, 32, 11, 218, 27, 108, 108, 190, 223, 104,
+            165, 28, 74, 57, 170, 48, 182, 7, 40, 20, 30, 200, 83, 2, 9, 206, 239, 183, 187, 54,
+            57, 61, 160, 194, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
         assert_eq!(header_1, header_again);
-
-        // header at seq num 1 with previous
-        let mut header_1_with_previous = Header::<()> {
-            version: 1,
-            public_key: private_key.public_key(),
-            signature: None,
-            payload_size: 0,
-            payload_hash: None,
-            timestamp: 0,
-            seq_num: 1,
-            backlink: Some(header_0.hash()),
-            previous: vec![header_0.hash()],
-            extensions: (),
-        };
-        header_1_with_previous.sign(&private_key);
-
-        let bytes = [
-            137, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 147,
-            144, 109, 231, 188, 44, 47, 38, 189, 192, 85, 151, 242, 49, 40, 30, 155, 198, 216, 52,
-            140, 216, 65, 66, 19, 227, 159, 175, 23, 107, 113, 180, 100, 44, 161, 228, 126, 219,
-            10, 85, 71, 59, 156, 117, 23, 1, 101, 224, 96, 75, 45, 25, 17, 37, 56, 78, 184, 120,
-            39, 115, 95, 127, 83, 3, 0, 0, 1, 88, 32, 201, 88, 182, 128, 125, 179, 108, 4, 23, 151,
-            168, 52, 216, 181, 123, 95, 11, 78, 75, 6, 236, 167, 141, 219, 243, 115, 255, 203, 100,
-            128, 30, 92, 129, 88, 32, 201, 88, 182, 128, 125, 179, 108, 4, 23, 151, 168, 52, 216,
-            181, 123, 95, 11, 78, 75, 6, 236, 167, 141, 219, 243, 115, 255, 203, 100, 128, 30, 92,
-            246,
-        ];
-
-        let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
-        assert_eq!(header_1_with_previous, header_again);
     }
 
     #[test]
@@ -725,10 +672,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header.sign(&private_key);

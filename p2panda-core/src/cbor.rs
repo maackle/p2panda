@@ -7,6 +7,7 @@
 //!
 //! [CBOR]: https://cbor.io/
 use std::io::Read;
+use std::sync::Arc;
 
 use ciborium::de::Error as DeserializeError;
 use ciborium::ser::Error as SerializeError;
@@ -52,13 +53,13 @@ impl From<SerializeError<std::io::Error>> for EncodeError {
 }
 
 /// An error occurred during CBOR deserialization.
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum DecodeError {
     /// An error occurred while reading bytes.
     ///
     /// Contains the underlying error returned while reading.
     #[error("an error occurred while reading bytes: {0}")]
-    Io(std::io::Error),
+    Io(Arc<std::io::Error>),
 
     /// An error occurred while parsing bytes.
     ///
@@ -83,7 +84,7 @@ pub enum DecodeError {
 impl From<DeserializeError<std::io::Error>> for DecodeError {
     fn from(value: DeserializeError<std::io::Error>) -> Self {
         match value {
-            DeserializeError::Io(err) => DecodeError::Io(err),
+            DeserializeError::Io(err) => DecodeError::Io(Arc::new(err)),
             DeserializeError::Syntax(offset) => DecodeError::Syntax(offset),
             DeserializeError::Semantic(offset, description) => {
                 DecodeError::Semantic(offset, description)
@@ -97,7 +98,7 @@ impl From<DeserializeError<std::io::Error>> for DecodeError {
 mod tests {
     use crate::{Body, Header, PrivateKey};
 
-    use super::{decode_cbor, encode_cbor};
+    use super::{DecodeError, decode_cbor, encode_cbor};
 
     #[test]
     fn encode_decode() {
@@ -115,5 +116,16 @@ mod tests {
         let header_again: Header<()> = decode_cbor(&bytes[..]).unwrap();
 
         assert_eq!(header.hash(), header_again.hash());
+    }
+
+    #[test]
+    fn decode_eof() {
+        // This is an incomplete byte sequence of a header / body tuple.
+        let bytes = hex::decode("828901582014d59877a250").unwrap();
+        let err = decode_cbor::<(Header<()>, Option<Body>), _>(&bytes[..]);
+
+        // We're expecting an "Unexpected EOF" error here. The underlying decoder should be able to
+        // detect that there's bytes missing.
+        assert!(matches!(err, Err(DecodeError::Io(_))));
     }
 }

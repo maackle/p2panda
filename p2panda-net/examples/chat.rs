@@ -1,43 +1,80 @@
-//! Example chat program using `p2panda-net`.
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+//! Example chat application using p2panda-net.
 //!
-//! `cargo run --example chat -- --help`
+//! Here we showcase the sync and gossip features of the p2panda-net API and demonstrate the
+//! configuration steps required to successfully run the required sub-systems.
 //!
-//! Arguments are exposed to control the networking setup, including local discovery over mDNS,
-//! relay connectivity and the specification of a bootstrap peer.
+//! Chat messages are sent using the p2panda log sync protocol; this allows catching up on past
+//! messages which were published before you came online. The gossip protocol is used to broadcast
+//! heartbeat messages which are used to display online / offline messages for other peers in the
+//! chat.
 //!
-//! # Scenario 1: Local Connectivity
+//! ## Usage
 //!
-//! Run the example with the `--use-mdns` flag if you wish to enable local network discovery.
-//! Run the same command in a second terminal to chat over the local network.
+//! Run the example on the first node:
 //!
-//! `cargo run --example chat -- --use-mdns`
+//! `cargo run --example chat`
 //!
-//! # Scenario 2: Internet Connectivity
+//! Run the example on a second node, using the chat topic ID and public key of the first node:
 //!
-//! Run the example with the `--use-relay` flag; take note of the `node id` in the terminal output.
+//! `cargo run --example chat -- -c <CHAT_TOPIC_ID> -b <FIRST_NODE_PUBLIC_KEY>`
 //!
-//! `cargo run --example chat -- --use-relay --is-bootstrap`
+//! Once several nodes are in the same chat, any node's public key can be supplied as the `-b`
+//! parameter (bootstrap node ID).
 //!
-//! Run the example on a second computer or in a second terminal with the `--use-relay` and
-//! `--bootstrap-peer <PUBLIC_KEY>` flags (passing in the `node id` from the first computer or
-//! terminal as `PUBLIC_KEY`).
-//!
-//! `cargo run --example chat -- --use-relay --bootstrap-peer <PUBLIC_KEY>`
-use anyhow::{Result, bail};
+//! Type into the terminal and press <ENTER> to send messages. Type `/nick <NICKNAME>` and press
+//! <ENTER> to set your desired nickname.
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::Result;
 use clap::Parser;
-use p2panda_core::{Hash, PrivateKey, PublicKey, Signature};
-use p2panda_discovery::mdns::LocalDiscovery;
-use p2panda_net::network::{FromNetwork, ToNetwork};
-use p2panda_net::{NetworkBuilder, TopicId};
-use p2panda_sync::TopicQuery;
-use rand::random;
+use futures_util::StreamExt;
+use iroh::EndpointAddr;
+use p2panda_core::cbor::{decode_cbor, encode_cbor};
+use p2panda_core::{Body, Hash, Header, Operation, PrivateKey, PublicKey, Timestamp, Topic};
+use p2panda_net::addrs::NodeInfo;
+use p2panda_net::iroh_endpoint::from_public_key;
+use p2panda_net::iroh_mdns::MdnsDiscoveryMode;
+use p2panda_net::utils::ShortFormat;
+use p2panda_net::{AddressBook, Discovery, Endpoint, Gossip, LogSync, MdnsDiscovery, NodeId};
+use p2panda_store::operations::OperationStore;
+use p2panda_store::topics::TopicStore;
+use p2panda_store::{SqliteStore, Transaction};
+use p2panda_sync::protocols::TopicLogSyncEvent as SyncEvent;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{RwLock, mpsc};
+use tokio::time::Instant;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
 
-// Relay server operated by p2panda team (may not be running the latest iroh release version).
-const RELAY_URL: &str = "https://wasser.liebechaos.org/";
+type LogId = u64;
+
+/// This application maintains only one log per author, this is why we can hard-code it.
+const LOG_ID: LogId = 1;
+
+const RELAY_URL: &str = "https://euc1-1.relay.n0.iroh-canary.iroh.link.";
+
+/// Heartbeat message to be sent over gossip (ephemeral messaging).
+#[derive(Debug, Serialize, Deserialize)]
+struct Heartbeat {
+    sender: PublicKey,
+    online: bool,
+    rnd: u64,
+}
+
+impl Heartbeat {
+    fn new(sender: PublicKey, online: bool) -> Self {
+        Self {
+            sender,
+            online,
+            rnd: rand::random(),
+        }
+    }
+}
 
 pub fn setup_logging() {
     tracing_subscriber::registry()
@@ -49,38 +86,17 @@ pub fn setup_logging() {
 
 #[derive(Parser)]
 struct Args {
-    /// Enable local discovery using mDNS.
-    #[arg(short = 'm', long)]
-    use_mdns: bool,
+    /// Bootstrap node identifier.
+    #[arg(short = 'b', long, value_name = "BOOTSTRAP_ID")]
+    bootstrap_id: Option<NodeId>,
 
-    /// Enable relay server connectivity.
-    #[arg(short = 'r', long)]
-    use_relay: bool,
+    /// Chat topic identifier.
+    #[arg(short = 'c', long, value_name = "CHAT_TOPIC_ID")]
+    chat_topic_id: Option<String>,
 
-    /// Enable bootstrap mode.
-    #[arg(short = 'b', long)]
-    is_bootstrap: bool,
-
-    /// Supply the public key of a bootstrap peer for discovery over the internet.
-    #[arg(short = 'p', long, value_name = "PUBLIC_KEY")]
-    bootstrap_peer: Option<PublicKey>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct ChatTopic(String, [u8; 32]);
-
-impl ChatTopic {
-    pub fn new(name: &str) -> Self {
-        Self(name.to_owned(), *Hash::new(name).as_bytes())
-    }
-}
-
-impl TopicQuery for ChatTopic {}
-
-impl TopicId for ChatTopic {
-    fn id(&self) -> [u8; 32] {
-        self.1
-    }
+    /// Enable mDNS discovery
+    #[arg(short = 'm', long, action)]
+    mdns: bool,
 }
 
 #[tokio::main]
@@ -89,167 +105,258 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let network_id = Hash::new(b"p2panda_chat_example");
-    let topic = ChatTopic::new("my_chat");
-
     let private_key = PrivateKey::new();
     let public_key = private_key.public_key();
 
-    // Configure the network.
-    let mut network_builder =
-        NetworkBuilder::<ChatTopic>::new(network_id.into()).private_key(private_key.clone());
-
-    if args.use_mdns {
-        network_builder = network_builder.discovery(LocalDiscovery::new());
-    }
-
-    if args.use_relay {
-        network_builder = network_builder.relay(RELAY_URL.parse()?, false, 3478);
-    }
-
-    if args.is_bootstrap {
-        network_builder = network_builder.bootstrap();
-    }
-
-    if let Some(node_id) = args.bootstrap_peer {
-        network_builder = network_builder.direct_address(node_id, vec![], None);
-    }
-
-    let network = network_builder.build().await?;
-
-    // Print network info to the terminal.
-    println!("node id:");
-    println!("\t{public_key}");
-    println!("network id:");
-    println!("\t{network_id}");
-    println!("node listening addresses:");
-    for local_endpoint in network
-        .endpoint()
-        .direct_addresses()
-        .initialized()
-        .await
-        .unwrap()
-    {
-        println!("\t{}", local_endpoint.addr)
-    }
-    println!("local discovery via mdns:");
-    if args.use_mdns {
-        println!("\tactive");
+    // Retrieve the chat topic ID from the provided arguments, otherwise generate a new, random,
+    // cryptographically-secure identifier.
+    let topic: Topic = if let Some(topic_str) = args.chat_topic_id {
+        topic_str.parse().expect("topic id should be 32 bytes")
     } else {
-        println!("\tinactive");
-    }
-    println!("node relay server url:");
-    if args.use_relay {
-        let relay_url = network
-            .endpoint()
-            .home_relay()
-            .get()
-            .unwrap()
-            .expect("should be connected to a relay server");
-        println!("\t{relay_url}");
-    } else {
-        println!("\tnot specified");
-    }
-    println!("bootstrap mode:");
-    if args.is_bootstrap {
-        println!("\tenabled");
-    } else {
-        println!("\tdisabled");
-    }
-    println!("bootstrap peer:");
-    if let Some(node_id) = args.bootstrap_peer {
-        println!("\t{node_id}");
-    } else {
-        println!("\tnot specified");
-    }
-    println!();
+        Topic::new()
+    };
 
-    // Subscribe to the chat topic.
-    let (tx, mut rx, ready) = network.subscribe(topic).await?;
+    // Create a temporary SQLite database to store topic associations and operations.
+    let store = SqliteStore::temporary().await;
 
-    // Receive topic messages from the network;
-    // decode and verify their integrity before printing them to the terminal.
+    // Associate our local log with the chat topic and commit it to the database.
+    let permit = store.begin().await?;
+    store.associate(&topic, &public_key, &LOG_ID).await?;
+    store.commit(permit).await?;
+
+    // Prepare address book.
+    let address_book = AddressBook::builder().spawn().await?;
+
+    // Add a bootstrap node to our address book if one was supplied by the user.
+    if let Some(id) = args.bootstrap_id {
+        let endpoint_addr = EndpointAddr::new(from_public_key(id));
+        let endpoint_addr = endpoint_addr.with_relay_url(RELAY_URL.parse()?);
+        address_book
+            .insert_node_info(NodeInfo::from(endpoint_addr).bootstrap())
+            .await?;
+    }
+
+    let endpoint = Endpoint::builder(address_book.clone())
+        .private_key(private_key.clone())
+        .relay_url(RELAY_URL.parse().unwrap())
+        .spawn()
+        .await?;
+
+    println!("network id: {}", endpoint.network_id().fmt_short());
+    println!("chat topic: {}", topic);
+    println!("public key: {}", public_key.to_hex());
+    println!("relay url: {}", RELAY_URL);
+
+    let _discovery = Discovery::builder(address_book.clone(), endpoint.clone())
+        .spawn()
+        .await?;
+
+    let mdns_discovery_mode = if args.mdns {
+        MdnsDiscoveryMode::Active
+    } else {
+        MdnsDiscoveryMode::Passive
+    };
+    let _mdns = MdnsDiscovery::builder(address_book.clone(), endpoint.clone())
+        .mode(mdns_discovery_mode)
+        .spawn()
+        .await?;
+
+    let gossip = Gossip::builder(address_book.clone(), endpoint.clone())
+        .spawn()
+        .await?;
+
+    // Subscribe to gossip overlay to receive and publish (ephemeral) messages.
+    let heartbeat_tx = gossip.stream(topic).await?;
+    let mut heartbeat_rx = heartbeat_tx.subscribe();
+
+    let final_heartbeat_tx = heartbeat_tx.clone();
+
+    // Mapping of public key to nickname.
+    let nicknames = Arc::new(RwLock::new(HashMap::<PublicKey, String>::new()));
+
+    // Mapping of public key to the instant that the last heartbeat message was received.
+    let status = Arc::new(RwLock::new(HashMap::new()));
+
+    // Publish (ephemeral) heartbeat messages.
     tokio::task::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                FromNetwork::GossipMessage { bytes, .. } => {
-                    match Message::decode_and_verify(&bytes) {
-                        Ok(message) => {
-                            print!("{}: {}", &message.public_key.to_string()[..5], message.text);
-                        }
-                        Err(err) => {
-                            eprintln!("invalid gossip message: {err}");
-                        }
-                    }
-                }
-                _ => panic!("no sync messages expected"),
-            }
+        loop {
+            // Create and serialize a heartbeat message.
+            let msg = Heartbeat::new(public_key, true);
+            let encoded_msg = encode_cbor(&msg).unwrap();
+
+            // Publish the message to the gossip topic.
+            heartbeat_tx.publish(encoded_msg).await.unwrap();
+
+            tokio::time::sleep(Duration::from_secs(rand::random_range(20..30))).await;
         }
     });
 
-    println!(".. waiting for peers to join ..");
-    let _ = ready.await;
-    println!("found other peers, you're ready to chat!");
+    // Receive and log each (ephemeral) heartbeat message.
+    {
+        let nicknames = Arc::clone(&nicknames);
+        let status = Arc::clone(&status);
+        tokio::spawn(async move {
+            loop {
+                if let Some(Ok(message)) = heartbeat_rx.next().await {
+                    let msg: Heartbeat = decode_cbor(&message[..]).expect("valid cbor encoding");
+
+                    info!("received heartbeat: {:?}", msg);
+
+                    // Look up nickname for sender.
+                    let name = if let Some(nickname) = nicknames.read().await.get(&msg.sender) {
+                        nickname.to_owned()
+                    } else {
+                        msg.sender.fmt_short()
+                    };
+
+                    // Update status hashmap.
+                    if status
+                        .write()
+                        .await
+                        .insert(msg.sender, Instant::now())
+                        .is_none()
+                    {
+                        println!("-> {} came online", name)
+                    }
+
+                    if !msg.online {
+                        status.write().await.remove(&msg.sender);
+                        println!("-> {} went offline", name)
+                    }
+                }
+            }
+        });
+    }
+
+    let sync = LogSync::<_, LogId, _>::builder(store.clone(), endpoint, gossip)
+        .spawn()
+        .await?;
+
+    let sync_tx = sync.stream(topic, true).await?;
+    let mut sync_rx = sync_tx.subscribe().await?;
+
+    // Receive messages from the sync stream.
+    {
+        let store = store.clone();
+        let nicknames = Arc::clone(&nicknames);
+        tokio::task::spawn(async move {
+            while let Some(Ok(from_sync)) = sync_rx.next().await {
+                match from_sync.event {
+                    SyncEvent::SessionFinished { metrics } => {
+                        info!(
+                            "finished sync session with {}, bytes received = {}, bytes sent = {}",
+                            from_sync.remote.fmt_short(),
+                            metrics.received_bytes(),
+                            metrics.sent_bytes()
+                        );
+                    }
+                    SyncEvent::OperationReceived { operation, .. } => {
+                        if <SqliteStore as OperationStore<Operation, Hash, LogId>>::has_operation(
+                            &store,
+                            &operation.hash,
+                        )
+                        .await
+                        .unwrap()
+                        {
+                            continue;
+                        }
+
+                        let remote_public_key = operation.header.public_key;
+                        let remote_id = remote_public_key.fmt_short();
+
+                        let text =
+                            String::from_utf8(operation.body.as_ref().unwrap().to_bytes()).unwrap();
+
+                        // Check if the text of this operation is setting a nickname.
+                        if let Some(nick) = text.strip_prefix("/nick ") {
+                            if let Some(previous_nick) =
+                                nicknames.read().await.get(&remote_public_key)
+                            {
+                                print!("-> {} is now known as: {}", previous_nick, nick);
+                            } else {
+                                print!("-> {} is now known as: {}", remote_id, nick);
+                            }
+
+                            // Update the nicknames map.
+                            nicknames
+                                .write()
+                                .await
+                                .insert(remote_public_key, nick.trim().to_owned());
+                        } else {
+                            // Print a regular chat message.
+                            print!(
+                                "{}: {}",
+                                nicknames
+                                    .read()
+                                    .await
+                                    .get(&remote_public_key)
+                                    .unwrap_or(&remote_id),
+                                text
+                            )
+                        }
+
+                        let permit = store.begin().await.unwrap();
+                        let id = operation.hash;
+                        let author = operation.header.public_key;
+                        store
+                            .insert_operation(&id, &operation, &LOG_ID)
+                            .await
+                            .unwrap();
+                        store.associate(&topic, &author, &LOG_ID).await.unwrap();
+                        store.commit(permit).await.unwrap();
+                    }
+                    _ => (),
+                }
+            }
+        });
+    }
 
     // Listen for text input via the terminal.
     let (line_tx, mut line_rx) = mpsc::channel(1);
     std::thread::spawn(move || input_loop(line_tx));
 
+    let mut seq_num = 0;
+    let mut backlink = None;
+
     // Sign and encode each line of text input and broadcast it on the chat topic.
-    while let Some(text) = line_rx.recv().await {
-        let bytes = Message::sign_and_encode(&private_key, &text)?;
-        tx.send(ToNetwork::Message { bytes }).await.ok();
-    }
+    tokio::task::spawn(async move {
+        while let Some(text) = line_rx.recv().await {
+            let body = Body::new(text.as_bytes());
+            let (hash, operation) = create_operation(&private_key, &body, seq_num, backlink);
+            let permit = store.begin().await.unwrap();
+            store
+                .insert_operation(&hash, &operation, &LOG_ID)
+                .await
+                .unwrap();
+            store.commit(permit).await.unwrap();
+
+            sync_tx.publish(operation).await.unwrap();
+
+            seq_num += 1;
+            backlink = Some(hash);
+
+            // Update the nickname mapping for the local node.
+            if let Some(nick) = text.strip_prefix("/nick ") {
+                print!("-> changed nick to: {}", nick);
+            }
+        }
+    });
 
     // Listen for `Ctrl+c` and shutdown the node.
     tokio::signal::ctrl_c().await?;
-    network.shutdown().await?;
+
+    // Create and serialize a final heartbeat message.
+    //
+    // This informs other chatters that we are going offline.
+    let msg = Heartbeat::new(public_key, false);
+    let encoded_msg = encode_cbor(&msg)?;
+
+    final_heartbeat_tx.publish(&encoded_msg[..]).await?;
+
+    // Sleep briefly to allow sending of heartbeat message.
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     Ok(())
-}
-
-#[derive(Serialize, Deserialize)]
-struct Message {
-    id: u32,
-    signature: Signature,
-    public_key: PublicKey,
-    text: String,
-}
-
-impl Message {
-    pub fn sign_and_encode(private_key: &PrivateKey, text: &str) -> Result<Vec<u8>> {
-        // Sign text content.
-        let mut text_bytes: Vec<u8> = Vec::new();
-        ciborium::ser::into_writer(text, &mut text_bytes)?;
-        let signature = private_key.sign(&text_bytes);
-
-        // Encode message.
-        let message = Message {
-            // Make every message unique, as duplicates get ignored during gossip broadcast.
-            id: random(),
-            signature,
-            public_key: private_key.public_key(),
-            text: text.to_owned(),
-        };
-        let mut bytes: Vec<u8> = Vec::new();
-        ciborium::ser::into_writer(&message, &mut bytes)?;
-
-        Ok(bytes)
-    }
-
-    fn decode_and_verify(bytes: &[u8]) -> Result<Self> {
-        // Decode message.
-        let message: Self = ciborium::de::from_reader(bytes)?;
-
-        // Verify signature.
-        let mut text_bytes: Vec<u8> = Vec::new();
-        ciborium::ser::into_writer(&message.text, &mut text_bytes)?;
-        if !message.public_key.verify(&text_bytes, &message.signature) {
-            bail!("invalid signature");
-        }
-
-        Ok(message)
-    }
 }
 
 fn input_loop(line_tx: mpsc::Sender<String>) -> Result<()> {
@@ -260,4 +367,34 @@ fn input_loop(line_tx: mpsc::Sender<String>) -> Result<()> {
         line_tx.blocking_send(buffer.clone())?;
         buffer.clear();
     }
+}
+
+fn create_operation(
+    private_key: &PrivateKey,
+    body: &Body,
+    seq_num: u64,
+    backlink: Option<Hash>,
+) -> (Hash, Operation) {
+    let mut header = Header {
+        version: 1,
+        public_key: private_key.public_key(),
+        signature: None,
+        payload_size: body.size(),
+        payload_hash: Some(body.hash()),
+        timestamp: Timestamp::now(),
+        seq_num,
+        backlink,
+        extensions: (),
+    };
+
+    header.sign(private_key);
+    let hash = header.hash();
+
+    let operation = Operation {
+        hash,
+        header: header.clone(),
+        body: Some(body.to_owned()),
+    };
+
+    (hash, operation)
 }

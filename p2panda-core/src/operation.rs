@@ -14,9 +14,8 @@
 //!
 //! Operations have a `backlink` and `seq_num` field in the header. These are used to form a linked
 //! list of operations, where every subsequent operation points to the previous one by referencing
-//! its cryptographically secured hash. The `previous` field can be used to point at operations by
-//! _other_ authors when multi-writer causal partial-ordering is required. The `timestamp` field
-//! can be used when verifiable causal ordering is not required.
+//! its cryptographically secured hash. The `timestamp` field can be used when verifiable causal
+//! ordering is not required.
 //!
 //! [Header extensions](crate::extensions) can be used to add additional information, like
 //! "pruning" points for removing old or unwanted data, "tombstones" for explicit deletion,
@@ -30,7 +29,7 @@
 //! ### Construct and sign a header
 //!
 //! ```
-//! use p2panda_core::{Body, Header, PrivateKey};
+//! use p2panda_core::{Body, Header, PrivateKey, Timestamp};
 //!
 //! let private_key = PrivateKey::new();
 //!
@@ -41,10 +40,9 @@
 //!     signature: None,
 //!     payload_size: body.size(),
 //!     payload_hash: Some(body.hash()),
-//!     timestamp: 1733170247,
+//!     timestamp: Timestamp::now(),
 //!     seq_num: 0,
 //!     backlink: None,
-//!     previous: vec![],
 //!     extensions: (),
 //! };
 //!
@@ -54,7 +52,7 @@
 //! ### Custom extensions
 //!
 //! ```
-//! use p2panda_core::{Body, Extension, Header, PrivateKey, PruneFlag};
+//! use p2panda_core::{Body, Extension, Header, PrivateKey, PruneFlag, Timestamp};
 //! use serde::{Serialize, Deserialize};
 //!
 //! let private_key = PrivateKey::new();
@@ -81,10 +79,9 @@
 //!     signature: None,
 //!     payload_size: body.size(),
 //!     payload_hash: Some(body.hash()),
-//!     timestamp: 1733170247,
+//!     timestamp: Timestamp::now(),
 //!     seq_num: 0,
 //!     backlink: None,
-//!     previous: vec![],
 //!     extensions,
 //! };
 //!
@@ -93,11 +90,15 @@
 //! let prune_flag: PruneFlag = header.extension().unwrap();
 //! assert!(prune_flag.is_set())
 //! ```
+use std::borrow::Borrow;
+
 use thiserror::Error;
 
 use crate::cbor::{DecodeError, decode_cbor, encode_cbor};
 use crate::hash::Hash;
 use crate::identity::{PrivateKey, PublicKey, Signature};
+use crate::timestamp::Timestamp;
+use crate::traits::Digest;
 use crate::{Extension, Extensions};
 
 /// Encoded bytes of an operation header and optional body.
@@ -111,6 +112,21 @@ pub struct Operation<E = ()> {
     pub body: Option<Body>,
 }
 
+impl<E> Operation<E>
+where
+    E: Extensions,
+{
+    /// Get a reference to the operation header.
+    pub fn header(&self) -> &Header<E> {
+        &self.header
+    }
+
+    /// Get a reference to the operation body.
+    pub fn body(&self) -> Option<&Body> {
+        self.body.as_ref()
+    }
+}
+
 impl<E> PartialEq for Operation<E> {
     fn eq(&self, other: &Self) -> bool {
         self.hash.eq(&other.hash)
@@ -119,6 +135,7 @@ impl<E> PartialEq for Operation<E> {
 
 impl<E> Eq for Operation<E> {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<E> PartialOrd for Operation<E> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.hash.cmp(&other.hash))
@@ -131,6 +148,12 @@ impl<E> Ord for Operation<E> {
     }
 }
 
+impl<E> Digest<Hash> for Operation<E> {
+    fn hash(&self) -> Hash {
+        self.hash
+    }
+}
+
 /// Header of a p2panda operation.
 ///
 /// The header holds all metadata required to cryptographically secure and authenticate a message
@@ -140,7 +163,7 @@ impl<E> Ord for Operation<E> {
 /// ## Example
 ///
 /// ```
-/// use p2panda_core::{Body, Header, Operation, PrivateKey};
+/// use p2panda_core::{Body, Header, Operation, PrivateKey, Timestamp};
 ///
 /// let private_key = PrivateKey::new();
 ///
@@ -151,17 +174,16 @@ impl<E> Ord for Operation<E> {
 ///     signature: None,
 ///     payload_size: body.size(),
 ///     payload_hash: Some(body.hash()),
-///     timestamp: 1733170247,
+///     timestamp: Timestamp::now(),
 ///     seq_num: 0,
 ///     backlink: None,
-///     previous: vec![],
 ///     extensions: (),
 /// };
 ///
 /// // Sign the header with the author's private key.
 /// header.sign(&private_key);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Header<E = ()> {
     /// Operation format version, allowing backwards compatibility when specification changes.
@@ -184,7 +206,7 @@ pub struct Header<E = ()> {
     pub payload_hash: Option<Hash>,
 
     /// Time in microseconds since the Unix epoch.
-    pub timestamp: u64,
+    pub timestamp: Timestamp,
 
     /// Number of operations this author has published to this log, begins with 0 and is always
     /// incremented by 1 with each new operation by the same author.
@@ -193,11 +215,6 @@ pub struct Header<E = ()> {
     /// Hash of the previous operation of the same author and log. Can be omitted if first
     /// operation in log.
     pub backlink: Option<Hash>,
-
-    /// List of hashes of the operations we refer to as the "previous" ones. These are operations
-    /// from other authors. Can be left empty if no partial ordering is required or no other
-    /// author has been observed yet.
-    pub previous: Vec<Hash>,
 
     /// Custom meta data.
     pub extensions: E,
@@ -211,10 +228,9 @@ impl<E: Default> Default for Header<E> {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: Timestamp::now(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: E::default(),
         }
     }
@@ -322,6 +338,10 @@ impl Body {
         self.0.clone()
     }
 
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
     /// BLAKE3 hash of the body bytes.
     pub fn hash(&self) -> Hash {
         Hash::new(&self.0)
@@ -391,10 +411,11 @@ pub enum OperationError {
 /// * If `payload_hash` is set the `payload_size` is > `0` otherwise it is zero
 /// * If `backlink` is set then `seq_num` is > `0` otherwise it is zero
 /// * If provided the body bytes hash and size match those claimed in the header
-pub fn validate_operation<E>(operation: &Operation<E>) -> Result<(), OperationError>
+pub fn validate_operation<E>(operation: impl Borrow<Operation<E>>) -> Result<(), OperationError>
 where
     E: Extensions,
 {
+    let operation = operation.borrow();
     validate_header(&operation.header)?;
 
     let claimed_payload_size = operation.header.payload_size;
@@ -409,10 +430,10 @@ where
         }
     };
 
-    if let Some(body) = &operation.body {
-        if claimed_payload_hash != Some(body.hash()) || claimed_payload_size != body.size() {
-            return Err(OperationError::PayloadMismatch);
-        }
+    if let Some(body) = &operation.body
+        && (claimed_payload_hash != Some(body.hash()) || claimed_payload_size != body.size())
+    {
+        return Err(OperationError::PayloadMismatch);
     }
 
     Ok(())
@@ -462,12 +483,15 @@ where
 /// * Current headers seq number increments from the past one by exactly `1`
 /// * Backlink hash contained in the current header matches the hash of the past header
 pub fn validate_backlink<E>(
-    past_header: &Header<E>,
-    header: &Header<E>,
+    past_header: impl Borrow<Header<E>>,
+    header: impl Borrow<Header<E>>,
 ) -> Result<(), OperationError>
 where
     E: Extensions,
 {
+    let past_header = past_header.borrow();
+    let header = header.borrow();
+
     if past_header.public_key != header.public_key {
         return Err(OperationError::TooManyAuthors);
     }
@@ -511,10 +535,9 @@ mod tests {
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: Timestamp::now(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
 
@@ -533,10 +556,9 @@ mod tests {
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: Timestamp::now(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: None::<CustomExtensions>,
         };
         assert!(!header.verify());
@@ -562,10 +584,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: Timestamp::now(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
         header_0.sign(&private_key);
@@ -577,10 +598,9 @@ mod tests {
             signature: None,
             payload_size: 0,
             payload_hash: None,
-            timestamp: 0,
+            timestamp: Timestamp::now(),
             seq_num: 1,
             backlink: Some(header_0.hash()),
-            previous: vec![],
             extensions: (),
         };
         header_1.sign(&private_key);
@@ -600,10 +620,9 @@ mod tests {
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: (),
         };
 
@@ -714,10 +733,9 @@ mod tests {
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
-            timestamp: 0,
+            timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
-            previous: vec![],
             extensions: extensions.clone(),
         };
 

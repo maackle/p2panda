@@ -2,7 +2,7 @@
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-left.gif" width="auto" height="30px">
-  <strong>Peer discovery traits and services</strong>
+  <strong>Confidential topic and node discovery protocol</strong>
   <img src="https://raw.githubusercontent.com/p2panda/.github/main/assets/panda-right.gif" width="auto" height="30px">
 </div>
 
@@ -22,10 +22,21 @@
   </h3>
 </div>
 
-This crate is used to share address information about peers on a network. It provides a generic
-interface for the definition of a discovery service, as well as an interface for organising a
-collection of such services. An mDNS discovery implementation is provided for peer discovery over
-local networks.
+Discovery can be used to find nodes which share a common interest in a topic.
+During this process, transport information is exchanged in order to aid in the
+establishment of direct peer-to-peer connections. A topic in p2panda is a
+secret, randomly-generated hash that plays a similar role to a shared symmetric
+key. Topics usually represent identifiers or namespaces for data and documents
+associated with a specific group of people (for example a text document, chat
+group or image folder). For this reason, a topic should never be leaked to
+people outside of the intended group, whether accidentally or purposefully.
+
+Our discovery protocol implementation is designed to ensure that topics are
+never leaked to unintended actors. Nodes will only ever exchange data when both
+parties have proven their knowledege of the same topic. This mutual
+acknowledgement is achieved using a secure multiparty cryptographic technique
+known as Private Equality Testing (PET) or Private Set Intersection (PSI) which
+prevents unrelated topics being leaked to other parties.
 
 ## License
 
@@ -40,7 +51,7 @@ additional terms or conditions.
 
 ---
 
-*This project has received funding from the European Union’s Horizon 2020
+_This project has received funding from the European Union’s Horizon 2020
 research and innovation programme within the framework of the NGI-POINTER
 Project funded under grant agreement No 871528, NGI-ASSURE No 957073 and
-NGI0-ENTRUST No 101069594*.
+NGI0-ENTRUST No 101069594_.
