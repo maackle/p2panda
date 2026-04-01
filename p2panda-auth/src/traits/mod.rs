@@ -4,6 +4,8 @@
 use std::fmt::Debug;
 use std::hash::Hash as StdHash;
 
+use named_id::Rename;
+
 mod dgm;
 mod operation;
 mod orderer;
@@ -18,14 +20,14 @@ pub use resolver::Resolver;
 ///
 /// Note that this needs to be unique within a group, can be a username, number or preferably a
 /// long byte string.
-pub trait IdentityHandle: Copy + Debug + PartialEq + Eq + StdHash {}
+pub trait IdentityHandle: Copy + Debug + PartialEq + Eq + StdHash + Rename + 'static {}
 
 /// Identifier for each group membership operation.
 ///
 /// Operations trigger changes of the group state and are usually sent in form of messages over the
 /// network. Each operation needs to be uniquely identifiable, preferably by a collision-resistant
 /// hash.
-pub trait OperationId: Copy + Debug + PartialEq + Eq + StdHash {}
+pub trait OperationId: Copy + Debug + PartialEq + Eq + StdHash + Rename + 'static {}
 
 /// Conditions associated with an actors access level.
-pub trait Conditions: Clone + Debug + PartialEq + PartialOrd {}
+pub trait Conditions: Clone + Debug + PartialEq + PartialOrd + Rename + 'static {}

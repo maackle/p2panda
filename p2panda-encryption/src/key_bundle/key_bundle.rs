@@ -85,6 +85,12 @@ pub struct LongTermKeyBundle {
     prekey_signature: XSignature,
 }
 
+impl named_id::Rename for LongTermKeyBundle {
+    fn nameables(&self) -> Vec<named_id::AnyNameable<'_>> {
+        vec![]
+    }
+}
+
 impl LongTermKeyBundle {
     pub fn new(
         identity_key: PublicKey,

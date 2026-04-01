@@ -7,7 +7,6 @@ use std::fmt::Debug;
 
 use p2panda_auth::Access;
 use p2panda_auth::traits::{Conditions, Operation};
-use p2panda_core::PrivateKey;
 use p2panda_encryption::RngError;
 use thiserror::Error;
 
@@ -80,12 +79,13 @@ where
     pub(crate) async fn create(
         manager_ref: Manager<ID, S, K, F, M, C, RS>,
         initial_members: Vec<(ActorId, Access<C>)>,
+        group_id: Option<ActorId>,
     ) -> Result<(Self, Vec<M>, Event<ID, C>), GroupError<ID, S, K, F, M, C, RS>> {
         // Generate random group id.
-        let group_id: ActorId = {
-            let manager = manager_ref.inner.read().await;
-            let private_key = PrivateKey::from_bytes(&manager.rng.random_array()?);
-            private_key.public_key().into()
+        let group_id = if let Some(group_id) = group_id {
+            group_id
+        } else {
+            manager_ref.random_id().await?
         };
 
         let initial_members = typed_members(manager_ref.clone(), initial_members)

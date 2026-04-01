@@ -121,6 +121,7 @@ where
         graph
     }
 
+    #[tracing::instrument(skip_all)]
     fn format_operation(&self, operation: &ORD::Operation) -> String {
         let control_message = operation.payload();
 

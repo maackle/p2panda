@@ -10,6 +10,7 @@
 //! encrypted data to Bob, and also establish a shared secret key for future communication.
 //!
 //! <https://signal.org/docs/specifications/x3dh/>
+use named_id::RenameAll;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -25,7 +26,7 @@ const KDF_INFO: &[u8; 7] = b"p2panda";
 
 /// Message containing encrypted payload and X3DH session-data to be delivered from sender to
 /// receiver.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 pub struct X3dhCiphertext {
     /// Identity of the sender.
     pub identity_key: PublicKey,

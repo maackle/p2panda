@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::fmt::Debug;
+
+use named_id::{Rename, RenameAll};
+
 #[cfg(any(test, feature = "serde"))]
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +13,7 @@ use crate::traits::IdentityHandle;
 ///
 /// The `Group` variant can be used to express nested group relations. In both cases, the member
 /// identifier is the same generic ID.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, RenameAll)]
 #[cfg_attr(any(test, feature = "serde"), derive(Deserialize, Serialize))]
 pub enum GroupMember<ID> {
     Individual(ID),
@@ -39,6 +43,15 @@ where
     /// Return true if this group member is an individual.
     pub fn is_individual(&self) -> bool {
         !self.is_group()
+    }
+}
+
+impl<ID> std::fmt::Display for GroupMember<ID>
+where
+    ID: Rename + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.clone().renamed())
     }
 }
 

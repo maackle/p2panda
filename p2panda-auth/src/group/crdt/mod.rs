@@ -432,6 +432,7 @@ where
 
     /// Process an operation created locally or received from a remote peer.
     #[allow(clippy::type_complexity)]
+    #[tracing::instrument(skip_all)]
     pub fn process(
         mut y: GroupCrdtState<ID, OP, C, ORD>,
         operation: &ORD::Operation,
@@ -501,7 +502,6 @@ where
                 operation.payload().group_id(),
             ));
         }
-
         // Adding a group as a manager of another group is currently not
         // supported.
         //
@@ -632,6 +632,7 @@ where
 }
 
 /// Apply an action to a single group state.
+#[tracing::instrument(skip_all)]
 pub(crate) fn apply_action<ID, OP, C>(
     mut groups_y: GroupStates<ID, C>,
     group_id: ID,
@@ -648,9 +649,13 @@ where
     let members_y = if action.is_create() {
         GroupMembersState::default()
     } else {
-        groups_y
-            .remove(&group_id)
-            .expect("group already present in states map")
+        groups_y.remove(&group_id).unwrap_or_else(|| {
+            panic!(
+                "group not present in states map: group_id={:?}, op={:?}",
+                group_id.renamed(),
+                id.renamed()
+            )
+        })
     };
 
     if filter.contains(&id) {

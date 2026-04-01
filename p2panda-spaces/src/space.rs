@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::convert::Infallible;
 use std::fmt::Debug;
 
+use named_id::{Nameable, Rename};
 use p2panda_auth::Access;
 use p2panda_auth::traits::{Conditions, Operation};
 use p2panda_encryption::traits::GroupMessage;
@@ -103,10 +104,12 @@ where
             initial_members.push((my_id, Access::manage()));
         }
 
+        let manager_clone = manager_ref.clone();
+
+        let fut = Group::create(manager_clone, initial_members, None);
+
         // Create new group for the space.
-        let (group, mut messages, auth_event) = Group::create(manager_ref.clone(), initial_members)
-            .await
-            .map_err(SpaceError::Group)?;
+        let (group, mut messages, auth_event) = fut.await.map_err(SpaceError::Group)?;
 
         // Instantiate new space state from existing global auth state.
         let y = Self::state_from_auth(
@@ -315,13 +318,13 @@ where
             let args = SpacesArgs::SpaceMembership {
                 space_id: y.space_id,
                 group_id: y.group_id,
-                auth_message_id: operation.id(),
+                auth_message_id: operation.id().with_serial(),
                 direct_messages: vec![],
                 space_dependencies,
             };
-            let message = manager.identity.forge(args).await?;
+            let message = manager.identity.forge(args.clone()).await?;
 
-            space_dependencies = vec![message.id()];
+            space_dependencies = vec![message.id().with_serial()];
             messages.push(message);
         }
         y.auth_y = auth_y;
@@ -330,6 +333,7 @@ where
 
     /// Handle messages which effect the space membership. Each of these messages contained a
     /// pointer to an auth message and the auth message is required here.
+    #[tracing::instrument(skip_all, fields(space_id = ?self.id().renamed(), group_id = ?self.manager.id().renamed()))]
     async fn handle_membership_message(
         &self,
         space_message: &M,
@@ -509,6 +513,7 @@ where
     }
 
     /// Handle space application messages.
+    #[tracing::instrument(skip_all, fields(space_id = ?self.id().renamed(), group_id = ?self.manager.id().renamed()))]
     async fn handle_application_message(
         &self,
         message: &M,

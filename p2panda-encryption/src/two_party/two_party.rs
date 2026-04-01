@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use named_id::RenameAll;
 use p2panda_core::cbor::{DecodeError, EncodeError, decode_cbor, encode_cbor};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -193,7 +194,7 @@ where
 }
 
 /// 2SM states indicating which key material was used.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 #[allow(clippy::enum_variant_names)]
 pub enum KeyUsed {
     /// Previously published keys ("prekeys") for X3DH.
@@ -211,13 +212,13 @@ pub enum KeyUsed {
 ///
 /// Note that this does not contain any additional information about the sender and receiver. This
 /// information needs to be added in applications.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 pub struct TwoPartyMessage {
     ciphertext: TwoPartyCiphertext,
     key_used: KeyUsed,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, RenameAll)]
 pub enum TwoPartyCiphertext {
     /// Message was encrypted using X3DH pre-keys (initial round).
     PreKey(X3dhCiphertext),

@@ -74,6 +74,7 @@
 //! // Sign the header with the author's private key. From now on it's ready to be sent!
 //! header.sign(&private_key);
 //! ```
+
 pub mod cbor;
 pub mod extensions;
 pub mod hash;

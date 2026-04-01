@@ -2,7 +2,7 @@
 
 mod forge;
 mod message;
-mod store;
+pub mod store;
 
 use p2panda_auth::traits::Conditions;
 use p2panda_encryption::Rng;
@@ -24,7 +24,7 @@ impl SpaceId for TestSpaceId {}
 
 pub type TestPeerId = u8;
 
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, named_id::RenameAll)]
 pub struct TestConditions {}
 
 impl Conditions for TestConditions {}

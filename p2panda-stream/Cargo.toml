@@ -28,6 +28,7 @@ orderer = [
 ]
 
 [dependencies]
+named-id = { git = "https://github.com/maackle/named-id.git" }
 futures-core = { version = "0.3.31", default-features = false, features = ["alloc"] }
 p2panda-core = { path = "../p2panda-core", version = "0.5.1", optional = true }
 p2panda-store = { path = "../p2panda-store", version = "0.5.1", optional = true }

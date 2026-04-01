@@ -27,7 +27,7 @@ pub type MemberId = usize;
 ///
 /// This contains the sender again as we need unique message ids and just using the sequence number
 /// would not be sufficient.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, named_id::RenameAll)]
 pub struct MessageId {
     pub sender: MemberId,
     pub seq: usize,

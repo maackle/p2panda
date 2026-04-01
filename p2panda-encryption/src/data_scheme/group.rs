@@ -89,6 +89,7 @@ where
         rng: &Rng,
     ) -> GroupResult<ORD::Message, ID, OP, PKI, DGM, KMG, ORD> {
         if y.is_welcomed {
+            tracing::error!("group already established: create()");
             return Err(GroupError::GroupAlreadyEstablished);
         }
 
@@ -190,6 +191,7 @@ where
         }) = message_content
         {
             if y.is_welcomed {
+                tracing::error!("group already established: receive()");
                 return Err(GroupError::GroupAlreadyEstablished);
             }
 
