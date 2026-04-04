@@ -3,13 +3,14 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use p2panda_core::PrivateKey;
+use p2panda_net::addrs::TrustedTransportInfo;
 use p2panda_net::discovery::DiscoveryConfig;
 use p2panda_net::gossip::GossipConfig;
-use p2panda_net::iroh_endpoint::RelayUrl;
+use p2panda_net::iroh_endpoint::{EndpointAddr, RelayUrl, from_public_key};
 use p2panda_net::iroh_mdns::MdnsDiscoveryMode;
 use p2panda_net::{NetworkId, NodeId};
 use p2panda_store::SqliteStore;
-use p2panda_store::sqlite::SqliteStoreBuilder;
+use p2panda_store::sqlite::{SqlitePool, SqliteStoreBuilder};
 
 use crate::Node;
 use crate::forge::OperationForge;
@@ -20,7 +21,7 @@ use crate::processor::{Pipeline, TaskTracker};
 pub struct NodeBuilder {
     private_key: Option<PrivateKey>,
     config: Config,
-    store: SqliteStoreBuilder,
+    store_options: StoreBuilderOptions,
 }
 
 impl NodeBuilder {
@@ -28,7 +29,7 @@ impl NodeBuilder {
         NodeBuilder {
             private_key: None,
             config: Config::default(),
-            store: SqliteStoreBuilder::default(),
+            store_options: StoreBuilderOptions::default(),
         }
     }
 
@@ -38,14 +39,12 @@ impl NodeBuilder {
     }
 
     pub fn database_url(mut self, url: &str) -> Self {
-        self.store = self.store.database_url(url);
+        self.store_options = StoreBuilderOptions::Url(url.to_string());
         self
     }
 
-    // TODO: Check if this is sufficient for Reflection to run custom migrations. Are we exporting
-    // the p2panda one's already in p2panda-store?
-    pub fn default_migrations(mut self, value: bool) -> Self {
-        self.store = self.store.run_default_migrations(value);
+    pub fn database_pool(mut self, pool: SqlitePool) -> Self {
+        self.store_options = StoreBuilderOptions::Pool(pool);
         self
     }
 
@@ -64,8 +63,12 @@ impl NodeBuilder {
         self
     }
 
-    pub fn bootstrap(mut self, node_id: NodeId) -> Self {
-        self.config.network.bootstraps.insert(node_id);
+    pub fn bootstrap(mut self, node_id: NodeId, relay_url: RelayUrl) -> Self {
+        let endpoint_addr = EndpointAddr::new(from_public_key(node_id)).with_relay_url(relay_url);
+        self.config
+            .network
+            .bootstraps
+            .insert((node_id, TrustedTransportInfo::from(endpoint_addr)));
         self
     }
 
@@ -106,7 +109,13 @@ impl NodeBuilder {
 
     pub async fn spawn(self) -> Result<Node, SpawnError> {
         let private_key = self.private_key.unwrap_or_default();
-        let store = self.store.build().await?;
+        let store = match self.store_options {
+            StoreBuilderOptions::Memory => SqliteStoreBuilder::new().build().await?,
+            StoreBuilderOptions::Url(url) => {
+                SqliteStoreBuilder::new().database_url(&url).build().await?
+            }
+            StoreBuilderOptions::Pool(pool) => SqliteStore::from_pool(pool),
+        };
         let forge = OperationForge::from_private_key(private_key, store.clone());
 
         let tasks = TaskTracker::new();
@@ -116,4 +125,12 @@ impl NodeBuilder {
 
         Ok(node)
     }
+}
+
+#[derive(Default)]
+enum StoreBuilderOptions {
+    #[default]
+    Memory,
+    Url(String),
+    Pool(SqlitePool),
 }
