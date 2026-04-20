@@ -13,6 +13,7 @@ use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 use mock_instant::SystemTimeError;
 #[cfg(any(test, feature = "test_utils"))]
 use mock_instant::thread_local::{SystemTime, UNIX_EPOCH};
+use named_id::RenameNone;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -20,7 +21,9 @@ use thiserror::Error;
 ///
 /// This is using microseconds instead leap seconds for larger precision (unlike standard UNIX
 /// timestamps).
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, StdHash, Serialize, Deserialize)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, StdHash, Serialize, Deserialize, RenameNone,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(transparent)]
 pub struct Timestamp(u64);
