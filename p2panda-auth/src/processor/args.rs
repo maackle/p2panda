@@ -11,7 +11,7 @@ use crate::processor::operation::GroupsOperation;
 use crate::traits::Conditions;
 
 /// Additional arguments which can be attached to a p2panda operation in their extensions.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GroupsArgs<C = ()> {
     pub group_id: PublicKey,
     pub action: GroupAction<PublicKey, C>,

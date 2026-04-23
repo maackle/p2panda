@@ -37,6 +37,10 @@ impl Timestamp {
         let now = SystemTime::now();
         now.try_into().expect("system time went backwards")
     }
+
+    pub fn as_micros(&self) -> u64 {
+        self.0
+    }
 }
 
 impl From<Timestamp> for u64 {
