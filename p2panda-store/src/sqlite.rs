@@ -234,6 +234,10 @@ impl SqliteStore {
     {
         f(&self.pool).await
     }
+
+    pub fn pool(&self) -> &sqlx::SqlitePool {
+        &self.pool
+    }
 }
 
 impl crate::traits::Transaction for SqliteStore {
