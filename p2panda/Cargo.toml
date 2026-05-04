@@ -9,7 +9,6 @@ authors = [
 ]
 repository = "https://github.com/p2panda/p2panda"
 license = "MIT OR Apache-2.0"
-readme = "README.md"
 
 [package.metadata.docs.rs]
 all-features = true
