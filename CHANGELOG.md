@@ -26,6 +26,10 @@ Highlights are marked with a pancake 🥞
 - Return error when gossip message exceeds maximum size [#1096](https://github.com/p2panda/p2panda/pull/1096)
 - Processor for groups operations [#1112](https://github.com/p2panda/p2panda/pull/1112)
 - `GroupsStore` with `SqliteStore` implementation [#1112](https://github.com/p2panda/p2panda/pull/1112)
+- Introduce `Author` and use super-trait in `p2panda-core` [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- Introduce `Cursor` type in core to track log heights [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- `CursorStore` to persist `Cursor` state in SQLite [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- Re-play events from any cursor, track acked state [#1104](https://github.com/p2panda/p2panda/pull/1104)
 
 ### Changed
 
@@ -42,12 +46,18 @@ Highlights are marked with a pancake 🥞
 - Use MockInstant for Timestamp when running tests [#1081](https://github.com/p2panda/p2panda/pull/1081)
 - Derive log id from topic [#1082](https://github.com/p2panda/p2panda/pull/1082)
 - Expose insert_bootstrap on the node API [#1125](https://github.com/p2panda/p2panda/pull/1125)
+- Update iroh to v0.98.1 [#1131](https://github.com/p2panda/p2panda/pull/1131)
+- Forge result is never `None` or duplicate [#1132](https://github.com/p2panda/p2panda/pull/1132)
+- Update iroh to v0.98.2 [#1137](https://github.com/p2panda/p2panda/pull/1137)
 
 ### Fixed
 
 - Fix missing gossip events in sync manager [#988](https://github.com/p2panda/p2panda/pull/988)
 - Enforce strictly growing operations log in backlink validation method [#1044](https://github.com/p2panda/p2panda/pull/1044)
 - Fix automatic roll-back of unused, dropped permits [#1075](https://github.com/p2panda/p2panda/pull/1075)
+- Race where replay_from misses processing ops [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- Race where replay state was determined late [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- React to node address changes in mDNS test [#1141](https://github.com/p2panda/p2panda/pull/1141)
 
 ## [0.5.2] - 09/03/2026
 

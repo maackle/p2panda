@@ -76,6 +76,7 @@
 //! ```
 
 pub mod cbor;
+pub mod cursor;
 pub mod extensions;
 pub mod hash;
 pub mod identity;
@@ -90,6 +91,7 @@ pub mod timestamp;
 pub mod topic;
 pub mod traits;
 
+pub use cursor::Cursor;
 pub use extensions::{Extension, Extensions};
 pub use hash::{Hash, HashError};
 pub use identity::{IdentityError, PrivateKey, PublicKey, Signature};
