@@ -10,7 +10,7 @@ use serde_bytes::{ByteBuf as SerdeByteBuf, Bytes as SerdeBytes};
 
 use crate::cursor::Cursor;
 use crate::hash::{Hash, HashError};
-use crate::identity::{Author, IdentityError, PrivateKey, PublicKey, Signature};
+use crate::identity::{Author, IdentityError, Signature, SigningKey, VerifyingKey};
 use crate::logs::LogHeights;
 use crate::operation::{Body, Header};
 use crate::timestamp::Timestamp;
@@ -67,7 +67,7 @@ impl<'de> Deserialize<'de> for Hash {
     }
 }
 
-impl Serialize for PrivateKey {
+impl Serialize for SigningKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -76,7 +76,7 @@ impl Serialize for PrivateKey {
     }
 }
 
-impl<'de> Deserialize<'de> for PrivateKey {
+impl<'de> Deserialize<'de> for SigningKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -90,7 +90,7 @@ impl<'de> Deserialize<'de> for PrivateKey {
     }
 }
 
-impl Serialize for PublicKey {
+impl Serialize for VerifyingKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -99,7 +99,7 @@ impl Serialize for PublicKey {
     }
 }
 
-impl<'de> Deserialize<'de> for PublicKey {
+impl<'de> Deserialize<'de> for VerifyingKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -146,7 +146,7 @@ where
     {
         let mut seq = serializer.serialize_seq(Some(self.field_count()))?;
         seq.serialize_element(&self.version)?;
-        seq.serialize_element(&self.public_key)?;
+        seq.serialize_element(&self.verifying_key)?;
 
         if let Some(signature) = &self.signature {
             seq.serialize_element(signature)?;
@@ -202,7 +202,7 @@ where
                     .next_element()?
                     .ok_or(SerdeError::custom("version missing"))?;
 
-                let public_key: PublicKey = seq
+                let verifying_key: VerifyingKey = seq
                     .next_element()?
                     .ok_or(SerdeError::custom("public key missing"))?;
 
@@ -248,9 +248,15 @@ where
                     .next_element()?
                     .ok_or(SerdeError::custom("extensions missing"))?;
 
+                if let Some(remainder) = seq.size_hint()
+                    && remainder > 0
+                {
+                    return Err(SerdeError::custom("unexpected excessive fields in header"));
+                }
+
                 Ok(Header {
                     version,
-                    public_key,
+                    verifying_key,
                     signature: Some(signature),
                     payload_hash,
                     payload_size,
@@ -379,7 +385,7 @@ mod tests {
 
     use crate::Body;
     use crate::hash::Hash;
-    use crate::identity::{PrivateKey, PublicKey};
+    use crate::identity::{SigningKey, VerifyingKey};
     use crate::operation::Header;
 
     use super::{deserialize_hex, serialize_hex};
@@ -414,7 +420,7 @@ mod tests {
     fn serialize_hash() {
         // Serialize CBOR (non human-readable byte encoding)
         let mut bytes: Vec<u8> = Vec::new();
-        let hash = Hash::new([1, 2, 3]);
+        let hash = Hash::digest([1, 2, 3]);
         ciborium::ser::into_writer(&hash, &mut bytes).unwrap();
         assert_eq!(
             bytes,
@@ -440,24 +446,24 @@ mod tests {
             155, 118, 91, 153, 198, 230, 14, 203, 250, 231, 66, 222, 73, 101, 67,
         ];
         let hash: Hash = ciborium::de::from_reader(&bytes[..]).unwrap();
-        assert_eq!(hash, Hash::new([1, 2, 3]));
+        assert_eq!(hash, Hash::digest([1, 2, 3]));
 
         // Deserialize JSON (human-readable hex encoding)
         let json = "\"b177ec1bf26dfb3b7010d473e6d44713b29b765b99c6e60ecbfae742de496543\"";
         let hash: Hash = serde_json::from_str(json).unwrap();
-        assert_eq!(hash, Hash::new([1, 2, 3]));
+        assert_eq!(hash, Hash::digest([1, 2, 3]));
     }
 
     #[test]
-    fn serialize_public_key() {
+    fn serialize_verifying_key() {
         // Serialize CBOR (non human-readable byte encoding)
         let mut bytes: Vec<u8> = Vec::new();
-        let public_key = PublicKey::from_bytes(&[
+        let verifying_key = VerifyingKey::from_bytes(&[
             215, 90, 152, 1, 130, 177, 10, 183, 213, 75, 254, 211, 201, 100, 7, 58, 14, 225, 114,
             243, 218, 166, 35, 37, 175, 2, 26, 104, 247, 7, 81, 26,
         ])
         .unwrap();
-        ciborium::ser::into_writer(&public_key, &mut bytes).unwrap();
+        ciborium::ser::into_writer(&verifying_key, &mut bytes).unwrap();
         assert_eq!(
             bytes,
             vec![
@@ -467,7 +473,7 @@ mod tests {
         );
 
         // Serialize JSON (human-readable hex encoding)
-        let json = serde_json::to_string(&public_key).unwrap();
+        let json = serde_json::to_string(&verifying_key).unwrap();
         assert_eq!(
             json,
             "\"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a\""
@@ -478,9 +484,9 @@ mod tests {
         E: Clone + std::fmt::Debug + PartialEq + Serialize + DeserializeOwned,
     >(
         mut header: Header<E>,
-        private_key: &PrivateKey,
+        signing_key: &SigningKey,
     ) {
-        header.sign(private_key);
+        header.sign(signing_key);
 
         let mut bytes = Vec::new();
         ciborium::ser::into_writer(&header, &mut bytes).unwrap();
@@ -496,27 +502,27 @@ mod tests {
         }
 
         let extensions = CustomExtensions { custom_field: 12 };
-        let private_key = PrivateKey::new();
+        let signing_key = SigningKey::generate();
 
         assert_serde_roundtrip(
             Header::<CustomExtensions> {
                 version: 1,
-                public_key: private_key.public_key(),
+                verifying_key: signing_key.verifying_key(),
                 payload_size: 123,
-                payload_hash: Some(Hash::new(vec![1, 2, 3])),
+                payload_hash: Some(Hash::digest(vec![1, 2, 3])),
                 timestamp: 0.into(),
                 seq_num: 0,
                 backlink: None,
                 extensions: extensions.clone(),
                 signature: None,
             },
-            &private_key,
+            &signing_key,
         );
 
         assert_serde_roundtrip(
             Header::<CustomExtensions> {
                 version: 1,
-                public_key: private_key.public_key(),
+                verifying_key: signing_key.verifying_key(),
                 payload_size: 0,
                 payload_hash: None,
                 timestamp: 0.into(),
@@ -525,18 +531,18 @@ mod tests {
                 extensions: extensions,
                 signature: None,
             },
-            &private_key,
+            &signing_key,
         );
     }
 
     #[test]
     fn expected_de_error() {
-        let private_key = PrivateKey::new();
+        let signing_key = SigningKey::generate();
 
         // payload size given without payload hash
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 2829099,
             payload_hash: None,
@@ -545,7 +551,7 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let result = ciborium::de::from_reader::<Header<()>, _>(&header.to_bytes()[..]);
         assert!(result.is_err());
@@ -553,16 +559,16 @@ mod tests {
         // payload hash given without payload size
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
-            payload_hash: Some(Hash::new([0, 1, 2])),
+            payload_hash: Some(Hash::digest([0, 1, 2])),
             timestamp: 0.into(),
             seq_num: 0,
             backlink: None,
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let result = ciborium::de::from_reader::<Header<()>, _>(&header.to_bytes()[..]);
         assert!(result.is_err());
@@ -570,16 +576,16 @@ mod tests {
         // backlink given with seq number 0
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
             timestamp: 0.into(),
             seq_num: 0,
-            backlink: Some(Hash::new([0, 1, 2])),
+            backlink: Some(Hash::digest([0, 1, 2])),
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let result = ciborium::de::from_reader::<Header<()>, _>(&header.to_bytes()[..]);
         assert!(result.is_err());
@@ -587,7 +593,7 @@ mod tests {
         // backlink not given with seq number > 0
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
@@ -596,7 +602,7 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let result = ciborium::de::from_reader::<Header<()>, _>(&header.to_bytes()[..]);
         assert!(result.is_err());
@@ -604,7 +610,7 @@ mod tests {
 
     #[test]
     fn serde_header_with_other_types() {
-        let private_key = PrivateKey::new();
+        let signing_key = SigningKey::generate();
 
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct Message {
@@ -615,7 +621,7 @@ mod tests {
         let body = Body::new(b"hello");
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
@@ -624,7 +630,7 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let message = Message { header, body };
 
@@ -637,7 +643,7 @@ mod tests {
 
     #[test]
     fn fixtures() {
-        let private_key = PrivateKey::from_bytes(&[
+        let signing_key = SigningKey::from_bytes(&[
             244, 123, 85, 215, 161, 204, 94, 227, 239, 253, 128, 164, 228, 160, 195, 49, 18, 49,
             125, 4, 50, 218, 157, 230, 174, 1, 154, 231, 231, 142, 22, 170,
         ]);
@@ -645,7 +651,7 @@ mod tests {
         // header at seq num 0
         let mut header_0 = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
@@ -654,15 +660,15 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header_0.sign(&private_key);
+        header_0.sign(&signing_key);
 
         let bytes = [
-            136, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 162,
-            119, 197, 116, 19, 137, 242, 179, 181, 27, 136, 2, 67, 77, 82, 72, 156, 204, 44, 201,
-            79, 86, 4, 213, 185, 131, 200, 124, 72, 221, 193, 208, 79, 113, 54, 72, 105, 221, 154,
-            214, 70, 101, 243, 141, 29, 200, 81, 253, 44, 29, 183, 180, 237, 217, 250, 247, 232,
-            77, 133, 174, 124, 113, 179, 0, 0, 0, 0, 246,
+            135, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 42,
+            11, 253, 219, 220, 200, 239, 31, 142, 159, 42, 215, 225, 66, 212, 199, 224, 81, 213,
+            150, 90, 253, 202, 2, 201, 94, 12, 1, 167, 36, 158, 173, 165, 8, 136, 9, 73, 19, 163,
+            174, 10, 96, 73, 198, 119, 18, 195, 129, 13, 114, 121, 16, 81, 155, 179, 182, 112, 123,
+            160, 63, 147, 206, 219, 7, 0, 0, 0, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
@@ -672,7 +678,7 @@ mod tests {
         let body = Body::new("Hello, Sloth!".as_bytes());
         let mut header_0_with_body = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: body.size(),
             payload_hash: Some(body.hash()),
@@ -681,17 +687,17 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header_0_with_body.sign(&private_key);
+        header_0_with_body.sign(&signing_key);
 
         let bytes = [
-            137, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 136,
-            51, 130, 185, 39, 243, 140, 206, 152, 146, 1, 227, 78, 244, 169, 189, 254, 93, 235,
-            141, 83, 18, 171, 96, 211, 31, 55, 236, 234, 186, 100, 232, 21, 185, 100, 104, 123,
-            215, 21, 32, 151, 104, 96, 50, 100, 158, 210, 24, 111, 4, 170, 114, 175, 175, 114, 236,
-            12, 145, 122, 49, 80, 223, 234, 0, 13, 88, 32, 191, 127, 68, 13, 227, 43, 252, 155, 49,
-            148, 176, 2, 162, 217, 175, 171, 49, 44, 181, 215, 71, 113, 211, 195, 29, 128, 192,
-            169, 5, 138, 160, 142, 0, 0, 246,
+            136, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 27,
+            199, 136, 138, 253, 125, 87, 20, 50, 247, 40, 93, 111, 176, 15, 63, 216, 239, 129, 134,
+            100, 162, 66, 133, 249, 181, 26, 79, 119, 128, 192, 86, 237, 32, 146, 71, 175, 180,
+            118, 146, 240, 172, 149, 99, 246, 177, 182, 110, 84, 49, 220, 60, 65, 70, 206, 79, 92,
+            237, 4, 43, 41, 202, 94, 10, 13, 88, 32, 191, 127, 68, 13, 227, 43, 252, 155, 49, 148,
+            176, 2, 162, 217, 175, 171, 49, 44, 181, 215, 71, 113, 211, 195, 29, 128, 192, 169, 5,
+            138, 160, 142, 0, 0, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
@@ -700,7 +706,7 @@ mod tests {
         // header at seq num 1 with backlink
         let mut header_1 = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
@@ -709,17 +715,17 @@ mod tests {
             backlink: Some(header_0.hash()),
             extensions: (),
         };
-        header_1.sign(&private_key);
+        header_1.sign(&signing_key);
 
         let bytes = [
-            137, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
-            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 163,
-            146, 208, 221, 247, 216, 191, 71, 252, 113, 232, 54, 108, 158, 15, 120, 152, 147, 198,
-            116, 165, 70, 159, 174, 48, 58, 107, 241, 0, 23, 87, 126, 246, 84, 165, 116, 131, 99,
-            252, 142, 92, 193, 76, 77, 96, 60, 82, 227, 146, 76, 92, 161, 84, 243, 135, 42, 138,
-            135, 226, 176, 46, 150, 141, 14, 0, 0, 1, 88, 32, 11, 218, 27, 108, 108, 190, 223, 104,
-            165, 28, 74, 57, 170, 48, 182, 7, 40, 20, 30, 200, 83, 2, 9, 206, 239, 183, 187, 54,
-            57, 61, 160, 194, 246,
+            136, 1, 88, 32, 228, 21, 196, 25, 12, 199, 241, 100, 122, 89, 46, 191, 142, 95, 144,
+            92, 42, 222, 249, 148, 139, 23, 91, 43, 92, 17, 225, 69, 17, 181, 22, 32, 88, 64, 198,
+            228, 65, 150, 97, 52, 1, 243, 222, 62, 11, 115, 104, 187, 64, 118, 179, 178, 190, 109,
+            15, 67, 36, 224, 172, 166, 199, 117, 59, 92, 164, 141, 190, 191, 151, 194, 193, 241,
+            115, 149, 98, 43, 39, 113, 255, 105, 24, 154, 136, 110, 250, 84, 159, 127, 192, 17,
+            240, 82, 84, 223, 41, 29, 150, 7, 0, 0, 1, 88, 32, 140, 19, 67, 147, 71, 66, 239, 37,
+            103, 212, 94, 71, 203, 133, 40, 89, 241, 1, 120, 215, 147, 204, 180, 108, 5, 39, 2,
+            178, 190, 77, 146, 144, 246,
         ];
 
         let header_again: Header<()> = ciborium::de::from_reader(&bytes[..]).unwrap();
@@ -728,11 +734,11 @@ mod tests {
 
     #[test]
     fn decode_non_map_extensions() {
-        let private_key = PrivateKey::new();
+        let signing_key = SigningKey::generate();
 
         let mut header = Header::<()> {
             version: 1,
-            public_key: private_key.public_key(),
+            verifying_key: signing_key.verifying_key(),
             signature: None,
             payload_size: 0,
             payload_hash: None,
@@ -741,7 +747,7 @@ mod tests {
             backlink: None,
             extensions: (),
         };
-        header.sign(&private_key);
+        header.sign(&signing_key);
 
         let result = ciborium::de::from_reader::<Header<()>, _>(&header.to_bytes()[..]);
         assert!(result.is_ok());

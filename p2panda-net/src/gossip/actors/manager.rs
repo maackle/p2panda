@@ -16,8 +16,8 @@ use crate::gossip::GossipConfig;
 use crate::gossip::actors::session::{GossipSession, ToGossipSession};
 use crate::gossip::events::GossipEvent;
 use crate::hash_protocol_id_with_network_id;
-use crate::iroh_endpoint::{Endpoint, from_public_key};
-use crate::utils::ShortFormat;
+use crate::iroh_endpoint::Endpoint;
+use crate::utils::{ShortFormat, from_verifying_key};
 
 pub enum ToGossipManager {
     /// Accept incoming "gossip protocol" connection requests.
@@ -75,6 +75,9 @@ pub enum ToGossipManager {
 
     /// Subscribe to system events.
     Events(RpcReplyPort<broadcast::Receiver<GossipEvent>>),
+
+    /// Gracefully shut down the gossip actor, cleaning up connection state.
+    Shutdown,
 }
 
 /// Mapping of topic to the associated sender channels for getting messages into and out of the
@@ -160,26 +163,6 @@ impl ThreadLocalActor for GossipManager {
         })
     }
 
-    async fn post_stop(
-        &self,
-        _myself: ActorRef<Self::Msg>,
-        state: &mut Self::State,
-    ) -> Result<(), ActorProcessingErr> {
-        // Leave all subscribed topics, send `Disconnect` messages to nodes and drop all state and
-        // connections.
-        if let Some(gossip) = state.gossip.take() {
-            // Make sure the endpoint has all the time it needs to gracefully shut down while other
-            // processes might already drop the whole actor.
-            tokio::task::spawn(async move {
-                if let Err(err) = gossip.shutdown().await {
-                    warn!("gossip failed during shutdown: {err:?}");
-                }
-            });
-        }
-
-        Ok(())
-    }
-
     async fn handle(
         &self,
         myself: ActorRef<Self::Msg>,
@@ -217,7 +200,7 @@ impl ThreadLocalActor for GossipManager {
                 // Convert p2panda public keys to iroh endpoint ids.
                 let nodes = nodes
                     .iter()
-                    .map(|key: &NodeId| from_public_key(*key))
+                    .map(|key: &NodeId| from_verifying_key(*key))
                     .collect();
 
                 // Subscribe to the gossip topic (without waiting for a connection).
@@ -307,7 +290,7 @@ impl ThreadLocalActor for GossipManager {
                 // Convert p2panda public keys to iroh endpoint ids.
                 let nodes: Vec<iroh::EndpointId> = nodes
                     .iter()
-                    .map(|key: &NodeId| from_public_key(*key))
+                    .map(|key: &NodeId| from_verifying_key(*key))
                     .collect();
 
                 if let Some(session) = state.sessions.sessions_by_topic.get(&topic) {
@@ -379,6 +362,13 @@ impl ThreadLocalActor for GossipManager {
             }
             ToGossipManager::Events(reply) => {
                 let _ = reply.send(state.events_tx.subscribe());
+            }
+            ToGossipManager::Shutdown => {
+                if let Some(gossip) = state.gossip.take()
+                    && let Err(err) = gossip.shutdown().await
+                {
+                    warn!("failed to gracefully shut down iroh gossip: {err:?}");
+                }
             }
         }
 

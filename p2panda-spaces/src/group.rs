@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use p2panda_auth::Access;
 use p2panda_auth::group::GroupAction;
 use p2panda_auth::traits::{Conditions, Operation};
+use p2panda_core::SigningKey;
 use p2panda_encryption::RngError;
 use thiserror::Error;
 
@@ -86,7 +87,9 @@ where
         let group_id = if let Some(group_id) = group_id {
             group_id
         } else {
-            manager_ref.random_id().await?
+            let manager = manager_ref.inner.read().await;
+            let signing_key = SigningKey::from_bytes(&manager.rng.random_array()?);
+            ActorId::from(signing_key.verifying_key())
         };
 
         let initial_members = typed_members(manager_ref.clone(), initial_members)

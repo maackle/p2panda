@@ -11,9 +11,10 @@ use tracing::{debug, trace, warn};
 use crate::NodeId;
 use crate::address_book::AddressBook;
 use crate::addrs::{AuthenticatedTransportInfo, NodeInfo, NodeTransportInfo, TransportInfo};
+use crate::iroh_endpoint::Endpoint;
 use crate::iroh_endpoint::user_data::UserDataTransportInfo;
-use crate::iroh_endpoint::{Endpoint, from_public_key, to_public_key};
 use crate::iroh_mdns::MdnsDiscoveryMode;
+use crate::utils::{from_verifying_key, to_verifying_key};
 
 const MDNS_SERVICE_NAME: &str = "p2pandav1";
 
@@ -64,7 +65,7 @@ impl ThreadLocalActor for MdnsActor {
         let my_node_id = endpoint.node_id();
 
         // Automatically initialise mDNS service after starting actor.
-        myself.send_message(ToMdns::Initialise(from_public_key(my_node_id), mode))?;
+        myself.send_message(ToMdns::Initialise(from_verifying_key(my_node_id), mode))?;
 
         Ok(MdnsState {
             my_node_id,
@@ -210,7 +211,10 @@ impl ThreadLocalActor for MdnsActor {
                         };
 
                         // Check authenticity.
-                        if transport_info.verify(&to_public_key(endpoint_id)).is_err() {
+                        if transport_info
+                            .verify(&to_verifying_key(endpoint_id))
+                            .is_err()
+                        {
                             warn!(
                                 %endpoint_id,
                                 "found invalid transport info coming from iroh's services"
@@ -223,7 +227,7 @@ impl ThreadLocalActor for MdnsActor {
                         if let Err(err) = state
                             .address_book
                             .insert_transport_info(
-                                to_public_key(endpoint_id),
+                                to_verifying_key(endpoint_id),
                                 transport_info.into(),
                             )
                             .await

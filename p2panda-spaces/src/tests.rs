@@ -634,12 +634,7 @@ async fn remove_member() {
     let message_03 = messages[0].clone();
     let message_04 = messages[1].clone();
 
-    let SpacesArgs::Auth {
-        group_id,
-        group_action,
-        auth_dependencies,
-    } = message_03.args()
-    else {
+    let SpacesArgs::Auth { group_action, .. } = message_03.args() else {
         panic!("expected auth message");
     };
 
@@ -764,12 +759,7 @@ async fn concurrent_removal_conflict() {
     let message_05 = messages[0].clone();
     let message_06 = messages[1].clone();
 
-    let SpacesArgs::Auth {
-        group_id,
-        group_action,
-        auth_dependencies,
-    } = message_05.args()
-    else {
+    let SpacesArgs::Auth { group_action, .. } = message_05.args() else {
         panic!("expected auth message");
     };
 
@@ -857,12 +847,7 @@ async fn space_from_existing_auth_state() {
     let message_03 = messages[1].clone();
     let message_04 = messages[2].clone();
 
-    let SpacesArgs::Auth {
-        group_id,
-        group_action,
-        auth_dependencies,
-    } = message_02.args()
-    else {
+    let SpacesArgs::Auth { group_action, .. } = message_02.args() else {
         panic!("expected auth message");
     };
 
@@ -961,7 +946,7 @@ async fn create_group() {
     let SpacesArgs::Auth {
         group_id,
         group_action,
-        auth_dependencies,
+        ..
     } = message_01.args()
     else {
         panic!("expected auth message");
@@ -2007,7 +1992,7 @@ async fn add_expired_member_to_group() {
         // Generate pre-key & sign it.
         let prekey_secret = SecretKey::from_rng(&rng).unwrap();
         let prekey = PreKey::new(
-            prekey_secret.public_key().unwrap(),
+            prekey_secret.verifying_key().unwrap(),
             Lifetime::from_range(now - 60, now + 1),
         );
         let signature = prekey
@@ -2016,7 +2001,7 @@ async fn add_expired_member_to_group() {
 
         // Wrap it in key bundle.
         let bundle = LongTermKeyBundle::new(
-            bob.credentials.identity_secret().public_key().unwrap(),
+            bob.credentials.identity_secret().verifying_key().unwrap(),
             prekey,
             signature,
         );
@@ -2057,7 +2042,7 @@ async fn process_operation_from_expired_member() {
         // Generate pre-key & sign it.
         let prekey_secret = SecretKey::from_rng(&rng).unwrap();
         let prekey = PreKey::new(
-            prekey_secret.public_key().unwrap(),
+            prekey_secret.verifying_key().unwrap(),
             Lifetime::from_range(now - 60, now + 1),
         );
         let signature = prekey
@@ -2066,7 +2051,7 @@ async fn process_operation_from_expired_member() {
 
         // Wrap it in key bundle.
         let bundle = LongTermKeyBundle::new(
-            bob.credentials.identity_secret().public_key().unwrap(),
+            bob.credentials.identity_secret().verifying_key().unwrap(),
             prekey,
             signature,
         );

@@ -4,13 +4,9 @@
 //!
 //! ## Usage
 //!
-//! Run the example on the first node:
+//! Run the example in any number of terminal windows:
 //!
 //! `cargo run --example groups`
-//!
-//! Run the example on a second node, using the topic ID and public key of the first node:
-//!
-//! `cargo run --example groups -- -t <TOPIC_ID> -b <FIRST_NODE_PUBLIC_KEY>`
 //!
 //! ### Commands
 //!
@@ -29,49 +25,44 @@
 //! remove <MEMBER_PUBLIC_KEY> <GROUP_ID>
 //! ```
 use std::collections::VecDeque;
+use std::thread;
 
 use anyhow::Result;
-use clap::Parser;
 use futures_util::StreamExt;
 use p2panda_auth::group::{GroupAction, GroupCrdtState, GroupMember};
 use p2panda_auth::processor::{GroupsArgs, GroupsOperation};
+use p2panda_auth::test_utils::setup_logging;
 use p2panda_auth::traits::Operation as GroupsOperationTrait;
 use p2panda_auth::{Access, AccessError};
+use p2panda_core::test_utils::TestLog;
 use p2panda_core::{
-    Extension, Hash, Header, IdentityError, Operation, PrivateKey, PublicKey, Timestamp, Topic,
+    Extension, Hash, Header, IdentityError, Operation, SigningKey, Topic, VerifyingKey,
 };
-use p2panda_net::addrs::NodeInfo;
-use p2panda_net::iroh_endpoint::{EndpointAddr, from_public_key};
 use p2panda_net::iroh_mdns::MdnsDiscoveryMode;
 use p2panda_net::utils::ShortFormat;
-use p2panda_net::{AddressBook, Discovery, Endpoint, Gossip, LogSync, MdnsDiscovery, NodeId};
-use p2panda_store::SqliteStore;
+use p2panda_net::{AddressBook, Discovery, Endpoint, Gossip, LogSync, MdnsDiscovery};
 use p2panda_store::groups::GroupsStore;
-use p2panda_store::topics::TopicStore;
+use p2panda_store::{SqliteStore, tx_unwrap};
 use p2panda_sync::protocols::TopicLogSyncEvent as SyncEvent;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::runtime::Builder;
 use tokio::sync::mpsc;
-use tracing::info;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::prelude::*;
+use tokio::task::LocalSet;
+use tracing::{debug, info};
 
 type LogId = u64;
-type GroupsState = GroupCrdtState<PublicKey, Hash, GroupsOperation<()>, ()>;
-type GroupsProcessor = p2panda_auth::processor::GroupsProcessor<AppExtensions, LogId>;
+type GroupsState = GroupCrdtState<VerifyingKey, Hash, GroupsOperation<()>, ()>;
+type GroupsProcessor = p2panda_auth::processor::GroupsProcessor<Topic, AppExtensions, LogId>;
 
 /// This application maintains only one log per author, this is why we can hard-code it.
 const LOG_ID: LogId = 1;
 
-const RELAY_URL: &str = "https://euc1-1.relay.n0.iroh-canary.iroh.link.";
+/// Identifier for the singleton group state used in this example.
+const GROUPS_STATE_ID: u32 = 0;
 
-pub fn setup_logging() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
-        .with(EnvFilter::from_default_env())
-        .try_init()
-        .ok();
-}
+/// Topic id for this example.
+const TOPIC: [u8; 32] = [1; 32];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppExtensions {
@@ -91,77 +82,31 @@ impl Extension<LogId> for AppExtensions {
     }
 }
 
-#[derive(Parser)]
-struct Args {
-    /// Bootstrap node identifier.
-    #[arg(short = 'b', long, value_name = "BOOTSTRAP_ID")]
-    bootstrap_id: Option<NodeId>,
-
-    /// Topic identifier.
-    #[arg(short = 't', long, value_name = "TOPIC")]
-    topic: Option<String>,
-
-    /// Enable mDNS discovery
-    #[arg(short = 'm', long, action)]
-    mdns: bool,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_logging();
 
-    let args = Args::parse();
+    let signing_key = SigningKey::generate();
+    let verifying_key = signing_key.verifying_key();
+    let topic = Topic::from(TOPIC);
 
-    let private_key = PrivateKey::new();
-    let public_key = private_key.public_key();
-
-    // Retrieve the chat topic ID from the provided arguments, otherwise generate a new, random,
-    // cryptographically-secure identifier.
-    let topic: Topic = if let Some(topic) = args.topic {
-        let topic = hex::decode(topic)?;
-        topic.try_into().expect("topic id should be 32 bytes")
-    } else {
-        Topic::new()
-    };
-
-    // Set up sync for p2panda operations.
+    // Setup p2panda networking stack.
     let store = SqliteStore::temporary().await;
-    store.associate(&topic, &public_key, &LOG_ID).await.unwrap();
-
-    // Prepare address book.
     let address_book = AddressBook::builder().spawn().await?;
 
-    // Add a bootstrap node to our address book if one was supplied by the user.
-    if let Some(id) = args.bootstrap_id {
-        let endpoint_addr = EndpointAddr::new(from_public_key(id));
-        let endpoint_addr = endpoint_addr.with_relay_url(RELAY_URL.parse()?);
-        address_book
-            .insert_node_info(NodeInfo::from(endpoint_addr).bootstrap())
-            .await?;
-    }
-
     let endpoint = Endpoint::builder(address_book.clone())
-        .private_key(private_key.clone())
-        .relay_url(RELAY_URL.parse().unwrap())
+        .signing_key(signing_key.clone())
         .spawn()
         .await?;
 
-    println!("network id: {}", endpoint.network_id().fmt_short());
-    println!("topic id: {}", topic.to_string());
-    println!("public key: {}", public_key.to_hex());
-    println!("relay url: {}", RELAY_URL);
+    println!("public key: {}", verifying_key.to_hex());
 
     let _discovery = Discovery::builder(address_book.clone(), endpoint.clone())
         .spawn()
         .await?;
 
-    let mdns_discovery_mode = if args.mdns {
-        MdnsDiscoveryMode::Active
-    } else {
-        MdnsDiscoveryMode::Passive
-    };
     let _mdns = MdnsDiscovery::builder(address_book.clone(), endpoint.clone())
-        .mode(mdns_discovery_mode)
+        .mode(MdnsDiscoveryMode::Active)
         .spawn()
         .await?;
 
@@ -176,9 +121,13 @@ async fn main() -> Result<()> {
     let sync_tx = sync.stream(topic, true).await?;
     let mut sync_rx = sync_tx.subscribe().await?;
 
+    // Construct groups processor.
+    let groups = GroupsProcessor::new(store.clone());
+
     // Receive messages from the sync stream.
     {
         let store = store.clone();
+        let groups = groups.clone();
         tokio::task::spawn(async move {
             while let Some(Ok(from_sync)) = sync_rx.next().await {
                 match from_sync.event {
@@ -191,20 +140,13 @@ async fn main() -> Result<()> {
                         );
                     }
                     SyncEvent::OperationReceived { operation, .. } => {
-                        if let Err(err) = GroupsProcessor::process(&topic, &store, &operation).await
+                        if let Err(err) = groups.process(&GROUPS_STATE_ID, &topic, &operation).await
                         {
-                            println!();
-                            println!("error: {err:?}");
-                            println!();
+                            debug!("error: {err:?}");
                             continue;
                         };
 
-                        store
-                            .associate(&topic, &operation.header.public_key, &LOG_ID)
-                            .await
-                            .unwrap();
-
-                        print_group(&topic, &store, &operation).await;
+                        print_group(&store, &operation).await;
                     }
                     _ => (),
                 }
@@ -214,48 +156,63 @@ async fn main() -> Result<()> {
 
     // Listen for text input via the terminal.
     let (line_tx, mut line_rx) = mpsc::channel(1);
-    std::thread::spawn(move || input_loop(line_tx));
+    thread::spawn(move || input_loop(line_tx));
 
-    let mut seq_num = 0;
-    let mut backlink = None;
+    let rt = Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime for current thread");
 
     // Sign and encode each line of text input and broadcast it on the chat topic.
-    tokio::task::spawn(async move {
-        while let Some(text) = line_rx.recv().await {
-            let (group_id, action) = match text_2_action(&topic, &store, public_key, text).await {
-                Ok(action) => action,
-                Err(err) => {
-                    println!();
-                    println!("error: {err:?}");
-                    println!();
+    thread::spawn(move || {
+        let local = LocalSet::new();
+
+        local.spawn_local(async move {
+            let log = TestLog::from_signing_key(signing_key);
+
+            while let Some(text) = line_rx.recv().await {
+                let (group_id, action) = match text_2_action(&store, verifying_key, text).await {
+                    Ok(action) => action,
+                    Err(err) => {
+                        debug!("error: {err:?}");
+                        continue;
+                    }
+                };
+
+                let y: GroupsState = tx_unwrap!(store, {
+                    store
+                        .get_groups_state(&GROUPS_STATE_ID)
+                        .await
+                        .unwrap()
+                        .unwrap_or_default()
+                });
+
+                let groups_args = GroupsArgs {
+                    group_id,
+                    action,
+                    dependencies: y.heads(),
+                };
+
+                let operation = log.operation(
+                    &[],
+                    AppExtensions {
+                        groups: Some(groups_args),
+                        log_id: LOG_ID,
+                    },
+                );
+
+                if let Err(err) = groups.process(&GROUPS_STATE_ID, &topic, &operation).await {
+                    debug!("error: {err:?}");
                     continue;
-                }
-            };
+                };
 
-            let y: GroupsState = store.get_state(&topic).await.unwrap().unwrap();
+                print_group(&store, &operation).await;
 
-            let groups_args = GroupsArgs {
-                group_id,
-                action,
-                dependencies: y.heads(),
-            };
+                sync_tx.publish(operation).await.unwrap();
+            }
+        });
 
-            let (hash, operation) = create_operation(&private_key, seq_num, backlink, groups_args);
-
-            if let Err(err) = GroupsProcessor::process(&topic, &store, &operation).await {
-                println!();
-                println!("error: {err:?}");
-                println!();
-                continue;
-            };
-
-            print_group(&topic, &store, &operation).await;
-
-            sync_tx.publish(operation).await.unwrap();
-
-            seq_num += 1;
-            backlink = Some(hash);
-        }
+        rt.block_on(local);
     });
 
     // Listen for `Ctrl+c` and shutdown the node.
@@ -274,39 +231,6 @@ fn input_loop(line_tx: mpsc::Sender<String>) -> Result<()> {
     }
 }
 
-fn create_operation(
-    private_key: &PrivateKey,
-    seq_num: u64,
-    backlink: Option<Hash>,
-    groups_args: GroupsArgs,
-) -> (Hash, Operation<AppExtensions>) {
-    let mut header = Header {
-        version: 1,
-        public_key: private_key.public_key(),
-        signature: None,
-        payload_size: 0,
-        payload_hash: None,
-        timestamp: Timestamp::now(),
-        seq_num,
-        backlink,
-        extensions: AppExtensions {
-            groups: Some(groups_args),
-            log_id: LOG_ID,
-        },
-    };
-
-    header.sign(private_key);
-    let hash = header.hash();
-
-    let operation = Operation {
-        hash,
-        header: header.clone(),
-        body: None,
-    };
-
-    (hash, operation)
-}
-
 #[derive(Debug, Error)]
 enum Text2ActionError {
     #[error("invalid arguments: {0}")]
@@ -323,14 +247,19 @@ enum Text2ActionError {
 }
 
 async fn text_2_action(
-    id: &Topic,
     store: &SqliteStore,
-    me: PublicKey,
+    me: VerifyingKey,
     text: String,
-) -> Result<(PublicKey, GroupAction<PublicKey>), Text2ActionError> {
-    let y = store.get_state(id).await.unwrap().unwrap();
+) -> Result<(VerifyingKey, GroupAction<VerifyingKey>), Text2ActionError> {
+    let y = tx_unwrap!(store, {
+        store
+            .get_groups_state(&GROUPS_STATE_ID)
+            .await
+            .unwrap()
+            .unwrap_or_default()
+    });
     let args = if let Some(_text) = text.strip_prefix("create") {
-        let group_id = PrivateKey::new().public_key();
+        let group_id = SigningKey::generate().verifying_key();
         (
             group_id,
             GroupAction::Create {
@@ -353,7 +282,7 @@ async fn text_2_action(
             ));
         };
 
-        let group_id: PublicKey = group_id.trim().parse()?;
+        let group_id: VerifyingKey = group_id.trim().parse()?;
 
         let Some(access) = args.pop_front() else {
             return Err(Text2ActionError::InvalidArgs(
@@ -379,7 +308,7 @@ async fn text_2_action(
             ));
         };
 
-        let group_id: PublicKey = group_id.trim().parse()?;
+        let group_id: VerifyingKey = group_id.trim().parse()?;
         let action = GroupAction::Remove { member };
         (group_id, action)
     } else {
@@ -392,8 +321,8 @@ async fn text_2_action(
 fn parse_member(
     y: &GroupsState,
     member_id: &str,
-) -> Result<GroupMember<PublicKey>, Text2ActionError> {
-    let member_id: PublicKey = member_id.trim().parse()?;
+) -> Result<GroupMember<VerifyingKey>, Text2ActionError> {
+    let member_id: VerifyingKey = member_id.trim().parse()?;
 
     // Check if this member is a group or individual.
     let member = if y.has_group(member_id) {
@@ -405,9 +334,22 @@ fn parse_member(
     Ok(member)
 }
 
-async fn print_group(id: &Topic, store: &SqliteStore, operation: &Operation<AppExtensions>) {
-    let groups_operation: GroupsOperation = operation.clone().try_into().unwrap();
-    let y: GroupsState = store.get_state(id).await.unwrap().unwrap();
+async fn print_group(store: &SqliteStore, operation: &Operation<AppExtensions>) {
+    let args = operation.header.extension::<GroupsArgs>().unwrap();
+    let groups_operation = GroupsOperation {
+        id: operation.hash,
+        author: operation.header.verifying_key,
+        dependencies: args.dependencies,
+        group_id: args.group_id,
+        action: args.action,
+    };
+    let y: GroupsState = tx_unwrap!(store, {
+        store
+            .get_groups_state(&GROUPS_STATE_ID)
+            .await
+            .unwrap()
+            .unwrap_or_default()
+    });
     let members = y
         .members(groups_operation.group_id())
         .into_iter()

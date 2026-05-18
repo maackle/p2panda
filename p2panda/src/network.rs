@@ -3,16 +3,15 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 
-use p2panda_core::{PrivateKey, Topic};
+use p2panda_core::{SigningKey, Topic};
 use p2panda_net::address_book::AddressBookError;
 use p2panda_net::addrs::{NodeInfo, TrustedTransportInfo};
 use p2panda_net::discovery::{DiscoveryConfig, DiscoveryError};
 use p2panda_net::gossip::{GossipConfig, GossipError};
-use p2panda_net::iroh_endpoint::{
-    EndpointAddr, EndpointError, IrohConfig, RelayUrl, from_public_key,
-};
-use p2panda_net::iroh_mdns::{MdnsDiscoveryError, MdnsDiscoveryMode};
+use p2panda_net::iroh_endpoint::{EndpointAddr, EndpointError, IrohConfig, RelayUrl};
+use p2panda_net::iroh_mdns::MdnsDiscoveryError;
 use p2panda_net::sync::LogSyncError;
+use p2panda_net::utils::from_verifying_key;
 use p2panda_net::{
     AddressBook, DEFAULT_NETWORK_ID, Discovery, Endpoint, Gossip, LogSync, MdnsDiscovery,
     NetworkId, NodeId,
@@ -23,10 +22,10 @@ use thiserror::Error;
 use crate::operation::Extensions;
 
 #[derive(Clone, Debug)]
-#[allow(unused)]
-pub struct Network {
+pub(crate) struct Network {
     pub address_book: AddressBook,
-    pub mdns: MdnsDiscovery,
+    #[allow(unused)]
+    pub mdns: Option<MdnsDiscovery>,
     pub endpoint: Endpoint,
     pub discovery: Discovery,
     pub gossip: Gossip,
@@ -36,11 +35,9 @@ pub struct Network {
 impl Network {
     pub async fn spawn(
         config: NetworkConfig,
-        private_key: PrivateKey,
+        signing_key: SigningKey,
         store: SqliteStore,
     ) -> Result<Self, NetworkError> {
-        // TODO: Supervision of actors.
-
         let address_book = AddressBook::builder().store(store.clone()).spawn().await?;
 
         for (node_id, transport_info) in config.bootstraps {
@@ -52,7 +49,7 @@ impl Network {
 
         let mut endpoint = Endpoint::builder(address_book.clone())
             .config(config.iroh)
-            .private_key(private_key)
+            .signing_key(signing_key)
             .network_id(config.network_id);
 
         for url in &config.relay_urls {
@@ -61,10 +58,17 @@ impl Network {
 
         let endpoint = endpoint.spawn().await?;
 
-        let mdns = MdnsDiscovery::builder(address_book.clone(), endpoint.clone())
-            .mode(config.mdns_mode)
-            .spawn()
-            .await?;
+        let mdns = match config.mdns_mode {
+            MdnsDiscoveryMode::Active | MdnsDiscoveryMode::Passive => {
+                let mdns = MdnsDiscovery::builder(address_book.clone(), endpoint.clone())
+                    .mode(config.mdns_mode.into())
+                    .spawn()
+                    .await?;
+
+                Some(mdns)
+            }
+            MdnsDiscoveryMode::Disabled => None,
+        };
 
         let discovery = Discovery::builder(address_book.clone(), endpoint.clone())
             .config(config.discovery)
@@ -95,19 +99,18 @@ impl Network {
         self.endpoint.node_id()
     }
 
-    #[allow(unused)]
     pub fn network_id(&self) -> NetworkId {
         self.endpoint.network_id()
     }
 
-    #[allow(unused)]
     pub async fn insert_bootstrap(
         &self,
         node_id: NodeId,
         relay_url: RelayUrl,
     ) -> Result<(), NetworkError> {
         let mut node_info = NodeInfo::new(node_id).bootstrap();
-        let endpoint_addr = EndpointAddr::new(from_public_key(node_id)).with_relay_url(relay_url);
+        let endpoint_addr =
+            EndpointAddr::new(from_verifying_key(node_id)).with_relay_url(relay_url);
         let transport_info = TrustedTransportInfo::from(endpoint_addr);
 
         if node_info.update_transports(transport_info.into()).is_ok() {
@@ -115,12 +118,37 @@ impl Network {
         }
         Ok(())
     }
+}
 
-    // TODO: Do we need methods to get the transport info (with ip addresses etc.)?
+/// mDNS discovery mode.
+///
+/// By default this is set to "active" meaning we are actively advertising our address and public
+/// key on local-area networks.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum MdnsDiscoveryMode {
+    /// mDNS discovery disabled.
+    Disabled,
+
+    /// Advertise our own and listen for others' discovery announcements.
+    #[default]
+    Active,
+
+    /// Listen for others' discovery announcements but don't advertise our own.
+    Passive,
+}
+
+impl From<MdnsDiscoveryMode> for p2panda_net::iroh_mdns::MdnsDiscoveryMode {
+    fn from(value: MdnsDiscoveryMode) -> Self {
+        match value {
+            MdnsDiscoveryMode::Disabled => unreachable!(),
+            MdnsDiscoveryMode::Active => Self::Active,
+            MdnsDiscoveryMode::Passive => Self::Passive,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
-pub struct NetworkConfig {
+pub(crate) struct NetworkConfig {
     pub network_id: NetworkId,
     pub relay_urls: HashSet<RelayUrl>,
     pub bootstraps: HashSet<(NodeId, TrustedTransportInfo)>,
@@ -144,6 +172,7 @@ impl Default for NetworkConfig {
     }
 }
 
+/// Errors coming from the networking layer.
 #[derive(Debug, Error)]
 pub enum NetworkError {
     #[error(transparent)]

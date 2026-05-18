@@ -100,8 +100,8 @@ where
     pub async fn random_id(&self) -> Result<ActorId, p2panda_encryption::RngError> {
         use named_id::Nameable;
         let manager = self.inner.read().await;
-        let private_key = p2panda_core::PrivateKey::from_bytes(&manager.rng.random_array()?);
-        Ok(private_key.public_key().with_serial().into())
+        let private_key = p2panda_core::SigningKey::from_bytes(&manager.rng.random_array()?);
+        Ok(private_key.verifying_key().with_serial().into())
     }
 
     /// Instantiate a new manager with custom configuration.
@@ -114,7 +114,7 @@ where
         config: &Config,
         rng: Rng,
     ) -> Result<Self, ManagerError<ID, S, K, F, M, C, RS>> {
-        let actor_id: ActorId = credentials.public_key().into();
+        let actor_id: ActorId = credentials.verifying_key().into();
         let identity = IdentityManager::new(key_store, forge, credentials, config, &rng).await?;
         let inner = ManagerInner {
             store,

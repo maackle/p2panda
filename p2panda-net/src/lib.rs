@@ -31,7 +31,7 @@
 //! use p2panda_net::{AddressBook, Discovery, Endpoint, MdnsDiscovery, Gossip};
 //!
 //! // Topics are used to discover other nodes and establish connections around them.
-//! let topic = Hash::new(b"shirokuma-cafe").into();
+//! let topic = Hash::digest(b"shirokuma-cafe").into();
 //!
 //! // Maintain an address book of newly discovered or manually added nodes.
 //! let address_book = AddressBook::builder().spawn().await?;
@@ -278,7 +278,7 @@ pub use sync::LogSync;
 ///
 /// Each node in p2panda has a unique identifier created as a cryptographic key to globally
 /// identify it and encrypt network traffic for this node only.
-pub type NodeId = p2panda_core::PublicKey;
+pub type NodeId = p2panda_core::VerifyingKey;
 
 /// Identifier for a network.
 ///
@@ -293,7 +293,7 @@ pub type NodeId = p2panda_core::PublicKey;
 /// if they are not using the same network identifier.
 ///
 /// **WARNING:** The network identifier is _not_ confidentially exchanged with a remote node and
-/// can not be treated as a secret value. See: https://github.com/p2panda/p2panda/issues/965
+/// can not be treated as a secret value. See: <https://github.com/p2panda/p2panda/issues/965>
 pub type NetworkId = [u8; 32];
 
 /// Identifier for a protocol.
@@ -317,7 +317,7 @@ fn hash_protocol_id_with_network_id(
     protocol_id: impl AsRef<[u8]>,
     network_id: NetworkId,
 ) -> Vec<u8> {
-    p2panda_core::Hash::new([protocol_id.as_ref(), &network_id].concat())
+    p2panda_core::Hash::digest([protocol_id.as_ref(), &network_id].concat())
         .as_bytes()
         .to_vec()
 }

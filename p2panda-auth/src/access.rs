@@ -154,10 +154,8 @@ impl<C: PartialOrd + Eq> Ord for Access<C> {
 impl Conditions for () {}
 
 #[derive(Debug, Error)]
-pub enum AccessError {
-    #[error("unknown access string: {0}")]
-    Unknown(String),
-}
+#[error("unknown access string: {0}")]
+pub struct AccessError(String);
 
 impl FromStr for Access {
     type Err = AccessError;
@@ -168,7 +166,7 @@ impl FromStr for Access {
             "read" => Access::read(),
             "write" => Access::write(),
             "manage" => Access::manage(),
-            _ => return Err(AccessError::Unknown(s.to_string())),
+            _ => return Err(AccessError(s.to_string())),
         };
 
         Ok(access)

@@ -95,12 +95,6 @@ impl Aggregator {
                 self.session_metrics.insert(session_id, metrics.clone());
                 self.total_bytes_sent += metrics.sent_bytes();
                 self.total_bytes_received += metrics.received_bytes();
-                None
-            }
-            TopicLogSyncEvent::SessionFinished { metrics } => {
-                self.handle_session_end(session_id);
-                self.total_bytes_sent += metrics.sent_bytes();
-                self.total_bytes_received += metrics.received_bytes();
                 Some(SyncEvent::SyncEnded {
                     remote,
                     session_id,
@@ -112,6 +106,12 @@ impl Aggregator {
                     received_bytes_topic_total: self.total_bytes_received(),
                     error: None,
                 })
+            }
+            TopicLogSyncEvent::SessionFinished { metrics } => {
+                self.handle_session_end(session_id);
+                self.total_bytes_sent += metrics.sent_bytes();
+                self.total_bytes_received += metrics.received_bytes();
+                None
             }
             TopicLogSyncEvent::Failed { error } => {
                 let metrics = self.handle_session_end(session_id);
@@ -157,6 +157,14 @@ impl Aggregator {
 }
 
 /// Which phase of a sync session an operation arrived in.
+///
+/// Nodes running the sync protocol will first exchange messages in order to catch up on past
+/// state. Once this initial `Sync` phase is complete, both nodes will hold identical sets of
+/// operations for the topic over which the sync session is running.
+///
+/// The nodes then move into the `Live` phase, where any newly-published messages for the relevant
+/// topic will be sent immediately over the sync session - without the nodes first having to
+/// announce and synchronise over their respective states.
 #[derive(Clone, Debug)]
 pub enum SessionPhase {
     Sync,
@@ -240,6 +248,7 @@ impl<E, M> From<SyncEvent<E>> for StreamEvent<M> {
     }
 }
 
+/// Error occurred during a sync session.
 #[derive(Clone, Debug, Error)]
 #[error("an error occurred during sync: {0}")]
 pub struct SyncError(String);

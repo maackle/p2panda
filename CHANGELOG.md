@@ -9,6 +9,8 @@ Highlights are marked with a pancake 🥞
 
 ## [Unreleased]
 
+## [0.6.0] - 18/05/2026
+
 ### Added
 
 - Ensure log transactions as atomic [#1060](https://github.com/p2panda/p2panda/pull/1060)
@@ -30,6 +32,15 @@ Highlights are marked with a pancake 🥞
 - Introduce `Cursor` type in core to track log heights [#1104](https://github.com/p2panda/p2panda/pull/1104)
 - `CursorStore` to persist `Cursor` state in SQLite [#1104](https://github.com/p2panda/p2panda/pull/1104)
 - Re-play events from any cursor, track acked state [#1104](https://github.com/p2panda/p2panda/pull/1104)
+- Processor for groups operations [#1112](https://github.com/p2panda/p2panda/pull/1112)
+- `GroupsStore` with `SqliteStore` implementation [#1112](https://github.com/p2panda/p2panda/pull/1112)
+- Node API for importing external operation streams [#1135](https://github.com/p2panda/p2panda/pull/1135)
+- Option to disable mDNS discovery [#1143](https://github.com/p2panda/p2panda/pull/1143)
+- Get current network id from `Node` [#1143](https://github.com/p2panda/p2panda/pull/1143)
+- Deduplicate received operations in sync manager event stream [#1147](https://github.com/p2panda/p2panda/pull/1147)
+- Todo list example with LWW-CRDT for Node API [#1148](https://github.com/p2panda/p2panda/pull/1148)
+- Method for getting filtered groups CRDT heads [#1102](https://github.com/p2panda/p2panda/pull/1102)
+- Add PartialEq and Eq derives to auth processor types [#1102](https://github.com/p2panda/p2panda/pull/1165)
 
 ### Changed
 
@@ -49,6 +60,8 @@ Highlights are marked with a pancake 🥞
 - Update iroh to v0.98.1 [#1131](https://github.com/p2panda/p2panda/pull/1131)
 - Forge result is never `None` or duplicate [#1132](https://github.com/p2panda/p2panda/pull/1132)
 - Update iroh to v0.98.2 [#1137](https://github.com/p2panda/p2panda/pull/1137)
+- Move shared dependencies into workspace Cargo.toml [#1150](https://github.com/p2panda/p2panda/pull/1150)
+- Rename core data types and methods [#1158](https://github.com/p2panda/p2panda/pull/1158)
 
 ### Fixed
 
@@ -58,6 +71,11 @@ Highlights are marked with a pancake 🥞
 - Race where replay_from misses processing ops [#1104](https://github.com/p2panda/p2panda/pull/1104)
 - Race where replay state was determined late [#1104](https://github.com/p2panda/p2panda/pull/1104)
 - React to node address changes in mDNS test [#1141](https://github.com/p2panda/p2panda/pull/1141)
+- Ensure iroh Gossip is shut down gracefully [#1139](https://github.com/p2panda/p2panda/pull/1139)
+- Correct "Sync Ended" event semantics in Node API [#1154](https://github.com/p2panda/p2panda/pull/1154)
+- Fix header CBOR encoding with correct field count [#1157](https://github.com/p2panda/p2panda/pull/1157)
+- Fix issues caused by dependency feature flag changes [#1164](https://github.com/p2panda/p2panda/pull/1164)
+- Fix dependency issues for all possible feature-flag combinations [#1168](https://github.com/p2panda/p2panda/pull/1168)
 
 ## [0.5.2] - 09/03/2026
 
@@ -210,7 +228,8 @@ Highlights are marked with a pancake 🥞
 
 Version `v0.1.0` represents the first release of the new p2panda stack! You can find out more details by reading our [blog](https://p2panda.org/2024/12/06/p2panda-release.html).
 
-[unreleased]: https://github.com/p2panda/p2panda/compare/v0.5.2...HEAD
+[unreleased]: https://github.com/p2panda/p2panda/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/p2panda/p2panda/releases/tag/v0.6.0
 [0.5.2]: https://github.com/p2panda/p2panda/releases/tag/v0.5.2
 [0.5.1]: https://github.com/p2panda/p2panda/releases/tag/v0.5.1
 [0.5.0]: https://github.com/p2panda/p2panda/releases/tag/v0.5.0

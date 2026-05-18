@@ -3,7 +3,7 @@
 use std::borrow::Borrow;
 
 use p2panda_core::traits::Digest;
-use p2panda_core::{Body, Hash, Header, LogId, Operation, PruneFlag, PublicKey, SeqNum};
+use p2panda_core::{Body, Hash, Header, LogId, Operation, PruneFlag, SeqNum, VerifyingKey};
 use p2panda_stream::ingest::{IngestArgs, IngestError, IngestResult};
 use p2panda_stream::log_prune::{LogPruneArgs, LogPruneError, LogPruneResult};
 use thiserror::Error;
@@ -35,7 +35,7 @@ pub struct Event<L, E, TP> {
     pub(crate) ingest: ProcessorStatus<IngestResult, IngestError>,
 
     /// Input arguments for the "log prune" processor.
-    log_prune_args: LogPruneArgs<PublicKey, L, SeqNum>,
+    log_prune_args: LogPruneArgs<VerifyingKey, L, SeqNum>,
 
     /// Status of the "log prune" processor.
     pub(crate) log_prune: ProcessorStatus<LogPruneResult, LogPruneError>,
@@ -61,7 +61,7 @@ where
             ingest: ProcessorStatus::Pending,
             log_prune_args: if prune_flag.is_set() {
                 LogPruneArgs::PruneEntriesUntil {
-                    author: operation.header.public_key,
+                    author: operation.header.verifying_key,
                     log_id,
                     seq_num: operation.header.seq_num,
                 }
@@ -73,21 +73,23 @@ where
         }
     }
 
+    /// System-level data (append-only log, pruning coordination, etc.) of this operation.
     pub fn header(&self) -> &Header<E> {
         &self.operation.header
     }
 
+    /// Payload of this operation.
     pub fn body(&self) -> Option<&Body> {
         self.operation.body.as_ref()
     }
 
-    /// Returns true if event has been successfully processed by the whole pipeline.
+    /// Returns `true` if event has been successfully processed by the whole pipeline.
     pub fn is_completed(&self) -> bool {
         matches!(self.ingest, ProcessorStatus::Completed(_))
             && matches!(self.log_prune, ProcessorStatus::Completed(_))
     }
 
-    /// Returns true if event failed somewhere during processing.
+    /// Returns `true` if event failed somewhere during processing.
     pub fn is_failed(&self) -> bool {
         matches!(self.ingest, ProcessorStatus::Failed(_))
             || matches!(self.log_prune, ProcessorStatus::Failed(_))
@@ -107,6 +109,10 @@ where
     }
 }
 
+/// Operation failed during event processing of the system-level pipeline.
+///
+/// This is likely to come from either processing invalid operations from a broken / malicious node
+/// or due to a bug in the Node API.
 #[derive(Clone, Debug, Error)]
 pub enum ProcessorError {
     #[error("ingest processor failed with: {0}")]
@@ -138,12 +144,12 @@ where
     }
 }
 
-impl<L, E, TP> Borrow<LogPruneArgs<PublicKey, L, SeqNum>> for Event<L, E, TP>
+impl<L, E, TP> Borrow<LogPruneArgs<VerifyingKey, L, SeqNum>> for Event<L, E, TP>
 where
     L: LogId,
     TP: Clone,
 {
-    fn borrow(&self) -> &LogPruneArgs<PublicKey, L, SeqNum> {
+    fn borrow(&self) -> &LogPruneArgs<VerifyingKey, L, SeqNum> {
         &self.log_prune_args
     }
 }

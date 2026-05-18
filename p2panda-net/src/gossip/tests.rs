@@ -27,13 +27,13 @@ async fn joined_and_left_events_are_received() {
 
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -113,19 +113,19 @@ async fn join_without_bootstrap() {
     // Create endpoints.
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let cat_endpoint = Endpoint::builder(cat_address_book.clone())
         .config(cat_args.iroh_config.clone())
-        .private_key(cat_args.private_key.clone())
+        .signing_key(cat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -196,7 +196,7 @@ async fn join_without_bootstrap() {
 
     assert_eq!(
         neighbours,
-        HashSet::from([bat_args.public_key, cat_args.public_key])
+        HashSet::from([bat_args.verifying_key, cat_args.verifying_key])
     );
 }
 
@@ -223,13 +223,13 @@ async fn two_peer_gossip() {
     // Create endpoints.
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -309,19 +309,19 @@ async fn third_peer_joins_non_bootstrap() {
     // Create endpoints.
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let cat_endpoint = Endpoint::builder(cat_address_book.clone())
         .config(cat_args.iroh_config.clone())
-        .private_key(cat_args.private_key.clone())
+        .signing_key(cat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -441,19 +441,19 @@ async fn three_peer_gossip_with_rejoin() {
     // Create endpoints.
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let cat_endpoint = Endpoint::builder(cat_address_book.clone())
         .config(cat_args.iroh_config.clone())
-        .private_key(cat_args.private_key.clone())
+        .signing_key(cat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -585,6 +585,9 @@ async fn leave_overlay_on_drop() {
     // See issue: https://github.com/p2panda/p2panda/issues/967
     setup_logging();
 
+    // Configure two nodes, ant and bat, which know about one another.
+    // Then get a handle to the same gossip topic stream for both.
+
     let mut ant_args = test_args();
     let mut bat_args = test_args();
     let topic: Topic = [1; 32].into();
@@ -594,13 +597,13 @@ async fn leave_overlay_on_drop() {
 
     let ant_endpoint = Endpoint::builder(ant_address_book.clone())
         .config(ant_args.iroh_config.clone())
-        .private_key(ant_args.private_key.clone())
+        .signing_key(ant_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
     let bat_endpoint = Endpoint::builder(bat_address_book.clone())
         .config(bat_args.iroh_config.clone())
-        .private_key(bat_args.private_key.clone())
+        .signing_key(bat_args.signing_key.clone())
         .spawn()
         .await
         .unwrap();
@@ -729,7 +732,7 @@ async fn large_message_error() {
 
     let args = test_args();
 
-    let topic = Topic::new();
+    let topic = Topic::random();
 
     // Create address book.
     let address_book = AddressBook::builder().spawn().await.unwrap();
@@ -737,7 +740,7 @@ async fn large_message_error() {
     // Create endpoint.
     let endpoint = Endpoint::builder(address_book.clone())
         .config(args.iroh_config.clone())
-        .private_key(args.private_key.clone())
+        .signing_key(args.signing_key.clone())
         .spawn()
         .await
         .unwrap();

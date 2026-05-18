@@ -6,14 +6,17 @@ use p2panda_core::hash::{HASH_LEN, Hash};
 use p2panda_core::{PruneFlag, Topic};
 use serde::{Deserialize, Serialize};
 
+/// Header type with our system-level extensions.
 pub type Header = p2panda_core::Header<Extensions>;
 
+/// Operation type with our system-level extensions.
 pub type Operation = p2panda_core::Operation<Extensions>;
 
 /// Versioning for internal extensions format.
 pub(crate) const VERSION: u64 = 1;
 
-// TODO: Make sure encoding is canonical over map keys (sort it before serializing).
+/// Header extensions used in the event processor pipeline to coordinate system-level concerns, for
+/// example pruning.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Extensions {
     #[serde(
@@ -40,6 +43,7 @@ impl Extensions {
     }
 }
 
+/// Append-only log identifier used by the Node API.
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, PartialEq, Eq, StdHash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct LogId(Hash);
@@ -52,7 +56,7 @@ impl LogId {
     ///
     /// To keep topic itself private we derive it with a BLAKE3 digest.
     pub fn from_topic(topic: Topic) -> Self {
-        LogId(Hash::new(topic.as_bytes()))
+        LogId(Hash::digest(topic.as_bytes()))
     }
 
     pub fn as_bytes(&self) -> &[u8; HASH_LEN] {
@@ -68,7 +72,7 @@ mod tests {
 
     #[test]
     fn derive_from_topic() {
-        let topic = Topic::new();
+        let topic = Topic::random();
         let log_id = LogId::from_topic(topic);
         assert_ne!(topic.as_bytes(), log_id.as_bytes());
     }
